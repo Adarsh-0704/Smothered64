@@ -1,0 +1,21 @@
+{
+  "name": "smothered",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @smothered/web --filter @smothered/server run dev",
+    "dev:web": "pnpm --filter @smothered/web run dev",
+    "dev:server": "pnpm --filter @smothered/server run dev",
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "pnpm -r --if-present run lint",
+    "test": "pnpm -r --if-present run test",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "packageManager": "pnpm@10.18.3"
+}
