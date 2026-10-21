@@ -1,0 +1,3 @@
+[submodule "packages/chess_rule_engine"]
+	path = packages/chess_rule_engine
+	url = https://github.com/ExplorInfinity/Chess_Rule_Engine.git

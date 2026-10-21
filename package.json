@@ -17,5 +17,8 @@
   "author": "",
   "license": "ISC",
   "private": true,
-  "packageManager": "pnpm@10.18.3"
+  "packageManager": "pnpm@10.18.3",
+  "devDependencies": {
+    "madge": "^8.0.0"
+  }
 }
