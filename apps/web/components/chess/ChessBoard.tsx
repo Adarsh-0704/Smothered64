@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { GameClient, GameClientState } from "@smothered/client";
-import type { PieceLayoutCode, PieceName, Position } from "@smothered/chess_rule_engine";
+import type {
+  PieceLayoutCode,
+  PieceName,
+  PieceNameCode,
+  Position,
+} from "@smothered/chess_rule_engine";
 import Piece from "./Piece";
 
 type BoardOrientation = "white" | "black";
@@ -12,6 +17,18 @@ interface ChessBoardProps {
   readonly orientation?: BoardOrientation;
   readonly className?: string;
 }
+
+interface PromotionMove {
+  readonly from: Position;
+  readonly to: Position;
+}
+
+const promotionChoices: readonly { code: PieceNameCode; label: string }[] = [
+  { code: "Q", label: "Queen" },
+  { code: "R", label: "Rook" },
+  { code: "B", label: "Bishop" },
+  { code: "N", label: "Knight" },
+];
 
 const pieceCodes: Record<PieceName, PieceLayoutCode> = {
   pawn: "wP",
@@ -70,9 +87,13 @@ export default function ChessBoard({
 }: ChessBoardProps) {
   const [state, setState] = useState<GameClientState>(() => gameClient.getState());
   const [error, setError] = useState<string | null>(null);
+  const [promotionMove, setPromotionMove] = useState<PromotionMove | null>(null);
 
   useEffect(() => {
-    const removeStateListener = gameClient.on("state", setState);
+    const removeStateListener = gameClient.on("state", (nextState) => {
+      setState(nextState);
+      setPromotionMove(null);
+    });
     const removeErrorListener = gameClient.on("error", (nextError) => {
       setError(nextError.message);
     });
@@ -98,6 +119,12 @@ export default function ChessBoard({
         x: state.selectedSq % 8,
         y: Math.floor(state.selectedSq / 8),
       };
+
+      const movingPiece = state.board.getAtPos(from);
+      if (movingPiece?.name === "pawn" && (position.y === 0 || position.y === 7)) {
+        setPromotionMove({ from, to: position });
+        return;
+      }
 
       try {
         gameClient.requestMove({ from, to: position });
@@ -162,6 +189,67 @@ export default function ChessBoard({
           })}
         </div>
       </div>
+      {promotionMove && (
+        <div
+          className="fixed inset-0 z-10 grid place-items-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="promotion-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#20272a] p-5 text-[#efe9d0] shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#c9a968]">
+                  Promotion
+                </p>
+                <h2 id="promotion-title" className="mt-1 text-xl font-semibold">
+                  Choose a piece
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-2 py-1 text-xl leading-none text-[#a9b0ae] hover:bg-white/10 hover:text-white"
+                aria-label="Cancel promotion"
+                onClick={() => setPromotionMove(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {promotionChoices.map((choice) => {
+                const color = state.board.getAtPos(promotionMove.from)?.color ?? state.turn;
+                const code = `${color === "white" ? "w" : "b"}${choice.code}` as PieceLayoutCode;
+
+                return (
+                  <button
+                    key={choice.code}
+                    type="button"
+                    className="group flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2 transition hover:border-[#c9a968] hover:bg-[#c9a968]/15 focus-visible:outline-2 focus-visible:outline-[#f5d46e]"
+                    aria-label={`Promote to ${choice.label}`}
+                    onClick={() => {
+                      try {
+                        gameClient.requestMove({
+                          from: promotionMove.from,
+                          to: promotionMove.to,
+                          promoteTo: choice.code,
+                        });
+                        setPromotionMove(null);
+                      } catch (requestError) {
+                        setError(requestError instanceof Error ? requestError.message : String(requestError));
+                      }
+                    }}
+                  >
+                    <span className="relative block h-16 w-16">
+                      <Piece code={code} name={`${color} ${choice.label.toLowerCase()}`} />
+                    </span>
+                    <span className="text-xs text-[#c4cbc7] group-hover:text-white">{choice.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
       {error && <p role="status">{error}</p>}
     </div>
   );
