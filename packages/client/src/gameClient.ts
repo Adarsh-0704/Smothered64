@@ -14,7 +14,9 @@ import type {
     CloseEvent,
     GameClientEvents,
     GameClientState,
-    GameServerMessage
+    GameServerMessage,
+    MatchEndedEvent,
+    MatchFoundEvent
 } from "./types/gameClient.js";
 
 type SocketConnectionOptions = Partial<ManagerOptions & SocketOptions>;
@@ -64,6 +66,11 @@ function isBoardLayout(value: unknown): value is BoardStringLayout
         value.every(row => Array.isArray(row) && row.length === BOARD_SIZE);
 }
 
+function isPieceColor(value: unknown): value is "white" | "black"
+{
+    return value === "white" || value === "black";
+}
+
 function parseServerMessage(data: unknown): GameServerMessage
 {
     const parsed = typeof data === "string" ? JSON.parse(data) : data;
@@ -80,14 +87,39 @@ function parseServerMessage(data: unknown): GameServerMessage
     }
 
     if (message.type === "state" || message.type === "game-state") {
-        if (!isBoardLayout(message.board)) throw new Error("Server state event contains an invalid board");
-        return { type: message.type, board: message.board };
+        if (!isBoardLayout(message.board) || !isPieceColor(message.turn))
+            throw new Error("Server state event contains an invalid board or turn");
+        return {
+            type: message.type,
+            board: message.board,
+            turn: message.turn,
+            matchId: typeof message.matchId === "string" ? message.matchId : undefined
+        };
     }
 
     if (message.type === "error" && typeof message.message === "string")
         return { type: "error", message: message.message };
 
     throw new Error("Unknown server message type");
+}
+
+function isMatchFoundEvent(value: unknown): value is MatchFoundEvent
+{
+    if (!value || typeof value !== "object") return false;
+    const match = value as Record<string, unknown>;
+    const opponent = match.opponent;
+    return typeof match.matchId === "string" &&
+        (match.color === "white" || match.color === "black") &&
+        !!opponent && typeof opponent === "object" &&
+        typeof (opponent as Record<string, unknown>).id === "string" &&
+        typeof (opponent as Record<string, unknown>).displayName === "string";
+}
+
+function isMatchEndedEvent(value: unknown): value is MatchEndedEvent
+{
+    if (!value || typeof value !== "object") return false;
+    const match = value as Record<string, unknown>;
+    return typeof match.matchId === "string" && typeof match.reason === "string";
 }
 
 class GameClient
@@ -99,6 +131,8 @@ class GameClient
     private removeSocketListeners: (() => void) | null = null;
     private selectedSq: number | null = null;
     private legalMoves: Position[] = [];
+    private playerColor: "white" | "black" | null = null;
+    private matchId: string | null = null;
     private readonly socketOptions: SocketConnectionOptions;
     private readonly createSocket: SocketFactory;
     private readonly listeners: {
@@ -109,6 +143,9 @@ class GameClient
         error: new Set(),
         message: new Set(),
         move: new Set(),
+        matchmakingWaiting: new Set(),
+        matchFound: new Set(),
+        matchEnded: new Set(),
         state: new Set()
     };
 
@@ -136,6 +173,8 @@ class GameClient
         return {
             board: this.getBoard(),
             turn: this.game.currentTurnColor,
+            playerColor: this.playerColor,
+            matchId: this.matchId,
             selectedSq: this.selectedSq,
             legalMoves: [...this.legalMoves],
             lastMove: this.game.lastMoveRecord,
@@ -245,7 +284,30 @@ class GameClient
                 this.handleMessage({ type: "state", ...state });
             };
             const onServerError = (message: unknown) => {
-                this.emit("error", new Error(typeof message === "string" ? message : String(message)));
+                const errorMessage = message && typeof message === "object" &&
+                    "message" in message && typeof message.message === "string"
+                    ? message.message
+                    : typeof message === "string" ? message : String(message);
+                this.emit("error", new Error(errorMessage));
+            };
+            const onMatchmakingWaiting = () => this.emit("matchmakingWaiting", undefined);
+            const onMatchFound = (payload: unknown) => {
+                if (isMatchFoundEvent(payload)) {
+                    this.playerColor = payload.color;
+                    this.matchId = payload.matchId;
+                    this.emit("matchFound", payload);
+                    this.emit("state", this.getState());
+                }
+                else this.emit("error", new Error("Server sent an invalid match-found event"));
+            };
+            const onMatchEnded = (payload: unknown) => {
+                if (isMatchEndedEvent(payload)) {
+                    this.playerColor = null;
+                    this.matchId = null;
+                    this.emit("matchEnded", payload);
+                    this.emit("state", this.getState());
+                }
+                else this.emit("error", new Error("Server sent an invalid match-ended event"));
             };
 
             this.addSocketListener(socket, "connect", onConnect);
@@ -257,6 +319,10 @@ class GameClient
             this.addSocketListener(socket, "state", onState);
             this.addSocketListener(socket, "game-state", onState);
             this.addSocketListener(socket, "game-error", onServerError);
+            this.addSocketListener(socket, "matchmaking:waiting", onMatchmakingWaiting);
+            this.addSocketListener(socket, "matchmaking:error", onServerError);
+            this.addSocketListener(socket, "match-found", onMatchFound);
+            this.addSocketListener(socket, "match-ended", onMatchEnded);
 
         });
 
@@ -305,11 +371,15 @@ class GameClient
                 this.emit("error", new Error(`Server sent an invalid move: ${remark.result}`));
         }
         else if (message.type === "state" || message.type === "game-state") {
-            if (!this.game.setBoardLayout(message.board)) {
+            const nextGame = new Game();
+            if (!nextGame.setBoardLayout(message.board)) {
                 this.emit("error", new Error("Server sent an invalid board state"));
                 return;
             }
 
+            nextGame.setCurrentTurnColor(message.turn);
+            this.game = nextGame;
+            if (message.matchId) this.matchId = message.matchId;
             this.refreshBoard();
             this.selectedSq = null;
             this.legalMoves = [];

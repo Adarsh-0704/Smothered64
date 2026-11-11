@@ -135,7 +135,10 @@ export default function ChessBoard({
     }
 
     const piece = state.board.getAtPos(position);
-    if (piece?.color === state.turn) gameClient.selectSquare(position);
+    if (piece?.color === state.turn &&
+      (state.playerColor === null || piece.color === state.playerColor)) {
+      gameClient.selectSquare(position);
+    }
     else gameClient.selectSquare(null);
   }
 

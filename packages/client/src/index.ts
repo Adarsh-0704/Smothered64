@@ -11,6 +11,8 @@ export type {
     GameClientEvents,
     GameClientState,
     GameServerMessage,
+    MatchEndedEvent,
+    MatchFoundEvent,
     MoveEvent,
     MoveMessage,
     StateMessage

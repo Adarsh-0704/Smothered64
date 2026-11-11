@@ -5,34 +5,75 @@ import { GameClient } from "@smothered/client";
 import ChessBoard from "./ChessBoard";
 
 export default function GameBoardDemo() {
-  const [gameClient] = useState(() => new GameClient());
+  const [gameClient, setGameClient] = useState<GameClient | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [matchStatus, setMatchStatus] = useState("Creating guest session…");
 
   useEffect(() => {
-    const removeOpenListener = gameClient.on("open", () => {
-      setConnected(true);
-      setConnectionError(null);
-    });
-    const removeCloseListener = gameClient.on("close", () => setConnected(false));
-    const removeErrorListener = gameClient.on("error", (error) => {
-      setConnectionError(error.message);
-    });
-    const serverUrl = process.env.NEXT_PUBLIC_GAME_SERVER_URL;
+    let active = true;
+    let client: GameClient | null = null;
+    let removeOpenListener = () => {};
+    let removeCloseListener = () => {};
+    let removeErrorListener = () => {};
+    let removeWaitingListener = () => {};
+    let removeMatchFoundListener = () => {};
+    let removeMatchEndedListener = () => {};
 
-    if (serverUrl) {
-      gameClient.connect(serverUrl).catch((error: unknown) => {
-        setConnectionError(error instanceof Error ? error.message : String(error));
+    async function startGuestSession() {
+      const serverUrl = process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
+      const storedToken = window.localStorage.getItem("smothered:guest-token");
+      const response = await fetch(`${serverUrl}/api/v1/auth/guest`, {
+        method: "POST",
+        headers: storedToken ? { Authorization: `Bearer ${storedToken}` } : undefined,
       });
+      if (!response.ok) throw new Error(`Guest session could not be created (${response.status})`);
+
+      const payload = await response.json() as { token?: unknown };
+      if (typeof payload.token !== "string") throw new Error("Guest session response did not include a token");
+      window.localStorage.setItem("smothered:guest-token", payload.token);
+
+      client = new GameClient(undefined, { socketOptions: { auth: { token: payload.token } } });
+      removeOpenListener = client.on("open", () => {
+        setConnected(true);
+        setConnectionError(null);
+      });
+      removeCloseListener = client.on("close", () => setConnected(false));
+      removeErrorListener = client.on("error", (error) => setConnectionError(error.message));
+      removeWaitingListener = client.on("matchmakingWaiting", () => {
+        setMatchStatus("Searching for an opponent…");
+      });
+      removeMatchFoundListener = client.on("matchFound", (match) => {
+        setMatchStatus(`Matched as ${match.color} · ${match.opponent.displayName}`);
+      });
+      removeMatchEndedListener = client.on("matchEnded", () => {
+        setMatchStatus("Searching for an opponent…");
+      });
+
+      if (!active) {
+        client.disconnect();
+        return;
+      }
+      setGameClient(client);
+      await client.connect(serverUrl);
+      client.send("matchmaking:join");
     }
 
+    startGuestSession().catch((error: unknown) => {
+      if (active) setConnectionError(error instanceof Error ? error.message : String(error));
+    });
+
     return () => {
+      active = false;
       removeOpenListener();
       removeCloseListener();
       removeErrorListener();
-      gameClient.disconnect();
+      removeWaitingListener();
+      removeMatchFoundListener();
+      removeMatchEndedListener();
+      client?.disconnect();
     };
-  }, [gameClient]);
+  }, []);
 
   return (
     <main className="flex min-h-full flex-1 flex-col items-center px-5 py-10 text-[#efe9d0] sm:px-8 sm:py-14">
@@ -54,10 +95,16 @@ export default function GameBoardDemo() {
         </div>
       </div>
 
-      <ChessBoard gameClient={gameClient} />
+      {gameClient ? (
+        <ChessBoard gameClient={gameClient} />
+      ) : (
+        <div className="flex aspect-square w-[min(88vw,720px)] items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm text-[#a9b0ae]">
+          Creating guest session…
+        </div>
+      )}
 
       <p className="mt-6 max-w-[720px] text-center text-xs leading-5 text-[#7f8b88]">
-        {connectionError ?? "Set NEXT_PUBLIC_GAME_SERVER_URL to send moves through Socket.IO."}
+        {connectionError ?? (connected ? matchStatus : "Creating guest session…")}
       </p>
     </main>
   );
