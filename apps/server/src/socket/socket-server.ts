@@ -62,7 +62,8 @@ function createSocketServer(httpServer: HttpServer, webOrigin: string): {
                 return;
             }
 
-            for (const player of match.players) player.emit("move", move);
+            matchmaking.recordMove(match, move);
+            for (const player of matchmaking.getConnectedPlayers(match)) player.emit("move", move);
         });
         socket.on("disconnect", () => matchmaking.disconnect(socket));
     });
