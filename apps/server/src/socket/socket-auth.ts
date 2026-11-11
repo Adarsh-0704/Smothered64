@@ -1,5 +1,5 @@
 import type { DefaultEventsMap, Socket } from "socket.io";
-import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
+import type { GameResult, GameStatus, MoveQuery, Position } from "@smothered/chess_rule_engine";
 import { userStore } from "../db/user-store.js";
 import { verifyToken } from "../utils/jwt.js";
 import type { PublicUser } from "../types/auth.js";
@@ -32,6 +32,7 @@ interface ServerToClientEvents {
         turn: "white" | "black";
     }) => void;
     move: (move: MoveQuery<Position>) => void;
+    "game-over": (payload: { matchId: string; status: GameStatus; result: GameResult }) => void;
     "game-error": (payload: { message: string }) => void;
 }
 

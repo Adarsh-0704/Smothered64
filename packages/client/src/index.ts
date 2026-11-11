@@ -10,6 +10,8 @@ export type {
     ErrorMessage,
     GameClientEvents,
     GameClientState,
+    GameOverEvent,
+    GameOverMessage,
     GameServerMessage,
     MatchEndedEvent,
     MatchFoundEvent,

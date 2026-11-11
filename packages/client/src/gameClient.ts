@@ -1,11 +1,16 @@
 import { io } from "socket.io-client";
 import type { ManagerOptions, Socket, SocketOptions } from "socket.io-client";
-import { BOARD_SIZE, ChessRuleSet, DefaultBoard, Game } from "@smothered/chess_rule_engine";
+import {
+    BOARD_SIZE,
+    ChessRuleSet,
+    DefaultBoard,
+    Game,
+    GameResult,
+    GameStatus
+} from "@smothered/chess_rule_engine";
 import type {
     BoardStringLayout,
     GameBoardContext,
-    GameResult,
-    GameStatus,
     MoveQuery,
     MoveRemark,
     Position
@@ -15,6 +20,7 @@ import type {
     GameClientEvents,
     GameClientState,
     GameServerMessage,
+    GameOverEvent,
     MatchEndedEvent,
     MatchFoundEvent
 } from "./types/gameClient.js";
@@ -71,6 +77,20 @@ function isPieceColor(value: unknown): value is "white" | "black"
     return value === "white" || value === "black";
 }
 
+function isGameStatus(value: unknown): value is GameStatus
+{
+    return value === GameStatus.NOT_STARTED || value === GameStatus.ACTIVE ||
+        value === GameStatus.WHITE_WON || value === GameStatus.BLACK_WON ||
+        value === GameStatus.DRAW;
+}
+
+function isGameResult(value: unknown): value is GameResult
+{
+    return typeof value === "number" && Number.isInteger(value) &&
+        value >= GameResult.PENDING &&
+        value <= GameResult.DRAW_BY_INSUFFICIENT_MATERIAL;
+}
+
 function parseServerMessage(data: unknown): GameServerMessage
 {
     const parsed = typeof data === "string" ? JSON.parse(data) : data;
@@ -99,6 +119,16 @@ function parseServerMessage(data: unknown): GameServerMessage
 
     if (message.type === "error" && typeof message.message === "string")
         return { type: "error", message: message.message };
+
+    if (message.type === "game-over" && typeof message.matchId === "string" &&
+        isGameStatus(message.status) && isGameResult(message.result)) {
+        return {
+            type: "game-over",
+            matchId: message.matchId,
+            status: message.status,
+            result: message.result
+        };
+    }
 
     throw new Error("Unknown server message type");
 }
@@ -146,6 +176,7 @@ class GameClient
         matchmakingWaiting: new Set(),
         matchFound: new Set(),
         matchEnded: new Set(),
+        gameOver: new Set(),
         state: new Set()
     };
 
@@ -309,6 +340,12 @@ class GameClient
                 }
                 else this.emit("error", new Error("Server sent an invalid match-ended event"));
             };
+            const onGameOver = (payload: unknown) => {
+                const message = payload && typeof payload === "object"
+                    ? { type: "game-over", ...payload }
+                    : payload;
+                this.handleMessage(message);
+            };
 
             this.addSocketListener(socket, "connect", onConnect);
             this.addSocketListener(socket, "connect_error", onConnectError);
@@ -323,6 +360,7 @@ class GameClient
             this.addSocketListener(socket, "matchmaking:error", onServerError);
             this.addSocketListener(socket, "match-found", onMatchFound);
             this.addSocketListener(socket, "match-ended", onMatchEnded);
+            this.addSocketListener(socket, "game-over", onGameOver);
 
         });
 
@@ -387,6 +425,20 @@ class GameClient
         }
         else if (message.type === "error") {
             this.emit("error", new Error(message.message));
+        }
+        else if (message.type === "game-over") {
+            if (this.matchId && message.matchId !== this.matchId) return;
+
+            this.game.setCurrentOutcome(message.status, message.result);
+            this.selectedSq = null;
+            this.legalMoves = [];
+            const gameOver: GameOverEvent = {
+                matchId: message.matchId,
+                status: message.status,
+                result: message.result
+            };
+            this.emit("gameOver", gameOver);
+            this.emit("state", this.getState());
         }
     }
 

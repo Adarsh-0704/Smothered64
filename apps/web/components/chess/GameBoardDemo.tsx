@@ -19,6 +19,7 @@ export default function GameBoardDemo() {
     let removeWaitingListener = () => {};
     let removeMatchFoundListener = () => {};
     let removeMatchEndedListener = () => {};
+    let removeGameOverListener = () => {};
 
     async function startGuestSession() {
       const serverUrl = process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
@@ -49,6 +50,9 @@ export default function GameBoardDemo() {
       removeMatchEndedListener = client.on("matchEnded", () => {
         setMatchStatus("Searching for an opponent…");
       });
+      removeGameOverListener = client.on("gameOver", () => {
+        setMatchStatus("Game over");
+      });
 
       if (!active) {
         client.disconnect();
@@ -71,6 +75,7 @@ export default function GameBoardDemo() {
       removeWaitingListener();
       removeMatchFoundListener();
       removeMatchEndedListener();
+      removeGameOverListener();
       client?.disconnect();
     };
   }, []);

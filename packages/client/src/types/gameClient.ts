@@ -39,7 +39,14 @@ interface ErrorMessage {
     readonly message: string;
 }
 
-type GameServerMessage = MoveMessage | StateMessage | ErrorMessage;
+interface GameOverMessage {
+    readonly type: "game-over";
+    readonly matchId: string;
+    readonly status: GameStatus;
+    readonly result: GameResult;
+}
+
+type GameServerMessage = MoveMessage | StateMessage | ErrorMessage | GameOverMessage;
 
 interface MoveEvent {
     readonly move: MoveQuery<Position>;
@@ -60,6 +67,12 @@ interface MatchEndedEvent {
     readonly reason: string;
 }
 
+interface GameOverEvent {
+    readonly matchId: string;
+    readonly status: GameStatus;
+    readonly result: GameResult;
+}
+
 interface CloseEvent {
     readonly code: number | null;
     readonly reason: string;
@@ -75,6 +88,7 @@ interface GameClientEvents {
     readonly matchmakingWaiting: undefined;
     readonly matchFound: MatchFoundEvent;
     readonly matchEnded: MatchEndedEvent;
+    readonly gameOver: GameOverEvent;
     readonly state: GameClientState;
 }
 
@@ -83,6 +97,8 @@ export type {
     ErrorMessage,
     GameClientEvents,
     GameClientState,
+    GameOverEvent,
+    GameOverMessage,
     GameServerMessage,
     MatchEndedEvent,
     MatchFoundEvent,

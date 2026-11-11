@@ -141,6 +141,11 @@ class MatchmakingService
         });
     }
 
+    public complete(match: Match): void
+    {
+        this.deleteMatch(match);
+    }
+
     private createMatch(first: AuthenticatedSocket, second: AuthenticatedSocket): void
     {
         const matchId = randomUUID();

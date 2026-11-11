@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { MatchmakingService } from "../matchmaking/matchmaking.service.js";
 import { authenticateSocket, type AuthenticatedSocket } from "./socket-auth.js";
+import { GameStatus } from "@smothered/chess_rule_engine";
 import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
 
 function isMoveQuery(value: unknown): value is MoveQuery<Position>
@@ -64,6 +65,18 @@ function createSocketServer(httpServer: HttpServer, webOrigin: string): {
 
             matchmaking.recordMove(match, move);
             for (const player of matchmaking.getConnectedPlayers(match)) player.emit("move", move);
+
+            if (match.game.currentStatus !== GameStatus.NOT_STARTED &&
+                match.game.currentStatus !== GameStatus.ACTIVE) {
+                const gameOver = {
+                    matchId: match.id,
+                    status: match.game.currentStatus,
+                    result: match.game.currentResult
+                } as const;
+                for (const player of matchmaking.getConnectedPlayers(match))
+                    player.emit("game-over", gameOver);
+                matchmaking.complete(match);
+            }
         });
         socket.on("disconnect", () => matchmaking.disconnect(socket));
     });

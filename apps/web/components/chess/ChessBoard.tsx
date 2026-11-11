@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GameClient, GameClientState } from "@smothered/client";
 import type {
+  GameResult,
   PieceLayoutCode,
   PieceName,
   PieceNameCode,
   Position,
 } from "@smothered/chess_rule_engine";
+import { GameResult as GameResultValue, GameStatus as GameStatusValue } from "@smothered/chess_rule_engine";
 import Piece from "./Piece";
 
 type BoardOrientation = "white" | "black";
@@ -80,6 +82,33 @@ function getLastMoveSquares(state: GameClientState): Set<number> {
   return squares;
 }
 
+function resultLabel(result: GameResult): string {
+  switch (result) {
+    case GameResultValue.CHECKMATE:
+      return "Checkmate";
+    case GameResultValue.STALEMATE:
+      return "Stalemate";
+    case GameResultValue.THREE_FOLD_REPETITION:
+      return "Threefold repetition";
+    case GameResultValue.FIFTY_MOVE_RULE:
+      return "Fifty-move rule";
+    case GameResultValue.DRAW_BY_INSUFFICIENT_MATERIAL:
+      return "Insufficient material";
+    default:
+      return "Game complete";
+  }
+}
+
+function outcomeCopy(state: GameClientState): { title: string; detail: string } {
+  if (state.status === GameStatusValue.DRAW)
+    return { title: "Draw", detail: resultLabel(state.result) };
+
+  const winningColor = state.status === GameStatusValue.WHITE_WON ? "white" : "black";
+  const winnerLabel = winningColor[0].toUpperCase() + winningColor.slice(1);
+  const title = state.playerColor === winningColor ? "You won" : "You lost";
+  return { title, detail: `${winnerLabel} wins · ${resultLabel(state.result)}` };
+}
+
 export default function ChessBoard({
   gameClient,
   orientation = "white",
@@ -109,8 +138,13 @@ export default function ChessBoard({
     () => new Set(state.legalMoves.map(positionToIndex)),
     [state.legalMoves],
   );
+  const isGameOver = state.status === GameStatusValue.WHITE_WON ||
+    state.status === GameStatusValue.BLACK_WON ||
+    state.status === GameStatusValue.DRAW;
 
   function handleSquareClick(position: Position) {
+    if (isGameOver) return;
+
     setError(null);
     const index = positionToIndex(position);
 
@@ -191,6 +225,30 @@ export default function ChessBoard({
             );
           })}
         </div>
+        {isGameOver && (() => {
+          const outcome = outcomeCopy(state);
+          return (
+            <div
+              className="absolute inset-0 z-[4] grid place-items-center bg-[#111719]/75 p-6 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="game-over-title"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-[#c9a968]/40 bg-[#20272a]/95 p-7 text-center text-[#efe9d0] shadow-2xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#c9a968]">
+                  Game over
+                </p>
+                <h2 id="game-over-title" className="mt-2 text-3xl font-semibold">
+                  {outcome.title}
+                </h2>
+                <p className="mt-3 text-sm text-[#c4cbc7]">{outcome.detail}</p>
+                <p className="mt-5 text-xs text-[#7f8b88]">
+                  Reload the page to join a new game.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
       {promotionMove && (
         <div
