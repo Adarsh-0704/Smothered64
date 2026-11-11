@@ -48,6 +48,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@smothered/chess_rule_engine':
+        specifier: workspace:*
+        version: link:../../packages/chess_rule_engine
+      '@smothered/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       next:
         specifier: 16.3.8
         version: 16.3.8(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
