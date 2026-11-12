@@ -28,7 +28,7 @@ export function verifyToken(token: string): AuthTokenPayload
         throw new Error("Invalid token payload");
 
     const payload = decoded as Partial<AuthTokenPayload>;
-    if (!payload.userId || (payload.userKind !== "guest" && payload.userKind !== "registered"))
+    if (typeof payload.userId !== 'string' || !payload.userId || (payload.userKind !== "guest" && payload.userKind !== "registered"))
         throw new Error("Invalid token payload");
 
     return {

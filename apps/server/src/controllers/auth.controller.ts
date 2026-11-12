@@ -34,9 +34,14 @@ export async function register(req: Request, res: Response): Promise<void>
         res.status(400).json({ message: "Name, email, and a password of at least 8 characters are required" });
         return;
     }
+    const cleanedEmail = email.trim().toLowerCase()
+    if (!cleanedEmail.includes('@') || !cleanedEmail.includes('.')) {
+        res.status(400).json({message: "Invalid email address"})
+        return;
+    }
 
     try {
-        const user = userStore.createRegistered(name, email, await hashPassword(password));
+        const user = userStore.createRegistered(name.trim(), cleanedEmail, await hashPassword(password));
         res.status(201).json({ token: generateToken(user), user });
     }
     catch (error) {
@@ -55,8 +60,9 @@ export async function login(req: Request, res: Response): Promise<void>
         res.status(400).json({ message: "Email and password are required" });
         return;
     }
+    const cleanedEmail = email.trim().toLowerCase()
 
-    const credentials = userStore.getCredentialsByEmail(email);
+    const credentials = userStore.getCredentialsByEmail(cleanedEmail);
     if (!credentials || !(await comparePassword(password, credentials.passwordHash))) {
         res.status(401).json({ message: "Invalid email or password" });
         return;
