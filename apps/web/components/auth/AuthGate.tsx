@@ -7,16 +7,17 @@ import type { FormEvent } from "react";
 import GameBoardDemo from "../chess/GameBoardDemo";
 
 import {
-  AUTH_TOKEN_KEY,
   createGuestSession,
   getCurrentUser,
   loginUser,
+  logoutUser,
   registerUser,
 } from "../../lib/auth";
 
 import type { AuthSession } from "../../lib/auth";
 
 type AuthMode = "login" | "register";
+const LEGACY_AUTH_TOKEN_KEY = "smothered:auth-token";
 
 export default function AuthGate() {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -27,41 +28,53 @@ export default function AuthGate() {
 
   // Restore a previously authenticated session.
   useEffect(() => {
-    let active = true;
+  let active = true;
 
-    async function restoreSession() {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  async function restoreSession() {
+    try {
+      // First restore the session using the HTTP-only cookie.
+      const user = await getCurrentUser();
 
-      if (!token) {
-        if (active) setChecking(false);
-        return;
+      localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+
+      if (active) {
+        setSession({ user });
       }
+    } catch {
+      // Migrate an existing guest session from the previous implementation.
+      const legacyToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
 
-      try {
-        const user = await getCurrentUser(token);
+      if (legacyToken) {
+        try {
+          const data = await createGuestSession(legacyToken);
 
-        if (active) {
-          setSession({ token, user });
+          localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+
+          if (active) {
+            setSession(data);
+          }
+        } catch {
+          // Keep the legacy token if the server is unavailable.
         }
-      } catch {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-      } finally {
-        if (active) setChecking(false);
+      }
+    } finally {
+      if (active) {
+        setChecking(false);
       }
     }
+  }
 
-    void restoreSession();
+  void restoreSession();
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  return () => {
+    active = false;
+  };
+}, []);
 
   function saveSession(data: AuthSession) {
-    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    setSession(data);
-    setError("");
-  }
+  setSession(data);
+  setError("");
+}
 
   // Handle registration and login.
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -118,12 +131,19 @@ export default function AuthGate() {
   }
 
   // Sign out.
-  function logout() {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+  async function logout() {
+  try {
+    await logoutUser();
+
     setSession(null);
     setMode("login");
     setError("");
+  } catch (err) {
+    setError(
+      err instanceof Error ? err.message : "Could not sign out",
+    );
   }
+}
 
   if (checking) {
     return (
@@ -137,10 +157,9 @@ export default function AuthGate() {
   if (session) {
     return (
       <GameBoardDemo
-        token={session.token}
-        user={session.user}
-        onLogout={logout}
-      />
+  user={session.user}
+  onLogout={logout}
+/>
     );
   }
 

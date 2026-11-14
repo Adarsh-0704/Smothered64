@@ -4,22 +4,18 @@ import { useEffect, useState } from "react";
 import { GameClient } from "@smothered/client";
 import ChessBoard from "./ChessBoard";
 import type { AuthUser } from "../../lib/auth";
+import Link from "next/link";
 
 interface GameBoardDemoProps {
-  token: string;
   user: AuthUser;
   onLogout: () => void;
 }
 
-export default function GameBoardDemo({
-  token,
-  user,
-  onLogout,
-}: GameBoardDemoProps) {
+export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
   const [gameClient, setGameClient] = useState<GameClient | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [matchStatus, setMatchStatus] = useState("Creating guest session…");
+  const [matchStatus, setMatchStatus] = useState("Connecting to your game…");
 
   useEffect(() => {
     let active = true;
@@ -36,12 +32,10 @@ export default function GameBoardDemo({
       const serverUrl =
         process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
 
-      // Connect using the authenticated user's JWT.
+      // Connect using the authenticated user's HTTP-only session cookie.
       client = new GameClient(undefined, {
         socketOptions: {
-          auth: {
-            token,
-          },
+          withCredentials: true,
         },
       });
 
@@ -107,7 +101,7 @@ export default function GameBoardDemo({
       removeGameOverListener();
       client?.disconnect();
     };
-  }, [token]);
+  }, []);
 
   return (
     <main className="flex min-h-full flex-1 flex-col items-center px-5 py-10 text-[#efe9d0] sm:px-8 sm:py-14">
@@ -125,7 +119,14 @@ export default function GameBoardDemo({
               <span className="text-sm text-[#c4cbc7]">
                 Playing as {user.displayName}
               </span>
-
+              {user.kind === "registered" && (
+                <Link
+                  href="/profile"
+                  className="rounded-full border border-[#c9a968]/50 px-4 py-2 text-xs text-[#c9a968] transition hover:bg-[#c9a968]/10"
+                >
+                  My Profile
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={onLogout}

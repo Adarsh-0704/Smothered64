@@ -1,4 +1,3 @@
-
 export interface AuthUser {
   id: string;
   displayName: string;
@@ -7,15 +6,21 @@ export interface AuthUser {
 }
 
 export interface AuthSession {
-  token: string;
   user: AuthUser;
 }
 
-const API_URL =
-  process.env.NEXT_PUBLIC_GAME_SERVER_URL ??
-  "http://localhost:3001";
+export interface AuthProfile {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  bio: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export const AUTH_TOKEN_KEY = "smothered:auth-token";
+const API_URL =
+  process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
 
 async function request<T>(
   endpoint: string,
@@ -23,23 +28,32 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(
     `${API_URL}/api/v1/auth${endpoint}`,
-    options,
+    {
+      ...options,
+      credentials: "include",
+    },
   );
 
-  const data = await response.json();
+  const data =
+    response.status === 204
+      ? undefined
+      : await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(
+    const message =
+      typeof data === "object" &&
+      data !== null &&
+      "message" in data &&
       typeof data.message === "string"
         ? data.message
-        : "Authentication request failed",
-    );
+        : "Authentication request failed";
+
+    throw new Error(message);
   }
 
   return data as T;
 }
 
-// Register a new user
 export function registerUser(
   name: string,
   email: string,
@@ -50,15 +64,10 @@ export function registerUser(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      name,
-      email,
-      password,
-    }),
+    body: JSON.stringify({ name, email, password }),
   });
 }
 
-// Login an existing user
 export function loginUser(
   email: string,
   password: string,
@@ -68,30 +77,53 @@ export function loginUser(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
+    body: JSON.stringify({ email, password }),
   });
 }
 
-// Continue as guest
-export function createGuestSession(): Promise<AuthSession> {
+export function createGuestSession(
+  legacyToken?: string,
+): Promise<AuthSession> {
   return request<AuthSession>("/guest", {
+    method: "POST",
+    headers: legacyToken
+      ? { Authorization: `Bearer ${legacyToken}` }
+      : undefined,
+  });
+}
+
+export async function getCurrentUser(): Promise<AuthUser> {
+  const response = await request<{ user: AuthUser }>("/me", {
+    method: "GET",
+  });
+
+  return response.user;
+}
+
+export function logoutUser(): Promise<void> {
+  return request<void>("/logout", {
     method: "POST",
   });
 }
 
-// Restore the currently authenticated user
-export async function getCurrentUser(
-  token: string,
-): Promise<AuthUser> {
-  const response = await request<{ user: AuthUser }>("/me", {
+export async function getProfile(): Promise<AuthProfile> {
+  const response = await request<{ profile: AuthProfile }>("/profile", {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
   });
 
-  return response.user;
+  return response.profile;
+}
+
+export async function updateProfile(
+  updates: { displayName?: string; bio?: string | null },
+): Promise<AuthProfile> {
+  const response = await request<{ profile: AuthProfile }>("/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+
+  return response.profile;
 }

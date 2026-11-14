@@ -5,83 +5,101 @@ import { authenticateSocket, type AuthenticatedSocket } from "./socket-auth.js";
 import { GameStatus } from "@smothered/chess_rule_engine";
 import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
 
-function isMoveQuery(value: unknown): value is MoveQuery<Position>
-{
-    if (!value || typeof value !== "object") return false;
-    const move = value as Record<string, unknown>;
-    const isPosition = (position: unknown): position is Position => {
-        if (!position || typeof position !== "object") return false;
-        const value = position as Record<string, unknown>;
-        return Number.isInteger(value.x) && Number.isInteger(value.y);
-    };
+function isMoveQuery(value: unknown): value is MoveQuery<Position> {
+  if (!value || typeof value !== "object") return false;
+  const move = value as Record<string, unknown>;
+  const isPosition = (position: unknown): position is Position => {
+    if (!position || typeof position !== "object") return false;
+    const value = position as Record<string, unknown>;
+    return Number.isInteger(value.x) && Number.isInteger(value.y);
+  };
 
-    return isPosition(move.from) && isPosition(move.to) &&
-        (move.promoteTo === undefined || typeof move.promoteTo === "string");
+  return (
+    isPosition(move.from) &&
+    isPosition(move.to) &&
+    (move.promoteTo === undefined || typeof move.promoteTo === "string")
+  );
 }
 
-function createSocketServer(httpServer: HttpServer, webOrigin: string): {
-    io: Server;
-    matchmaking: MatchmakingService;
-}
-{
-    const io = new Server(httpServer, {
-        cors: {
-            origin: webOrigin === "*" ? true : webOrigin,
-            credentials: true
-        }
-    });
-    const matchmaking = new MatchmakingService();
+function createSocketServer(
+  httpServer: HttpServer,
+  webOrigin: string,
+): {
+  io: Server;
+  matchmaking: MatchmakingService;
+} {
+  const allowedOrigins = webOrigin
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin && origin !== "*");
 
-    io.use(authenticateSocket);
-    io.on("connection", rawSocket => {
-        const socket = rawSocket as AuthenticatedSocket;
-        socket.emit("session:ready", { user: socket.data.user });
+  const io = new Server(httpServer, {
+    cors: {
+      origin: allowedOrigins,
+      credentials: true,
+    },
+  });
+  const matchmaking = new MatchmakingService();
 
-        socket.on("matchmaking:join", () => matchmaking.join(socket));
-        socket.on("matchmaking:leave", () => matchmaking.leave(socket));
-        socket.on("move", move => {
-            if (!isMoveQuery(move)) {
-                socket.emit("game-error", { message: "Invalid move payload" });
-                return;
-            }
+  io.use(authenticateSocket);
+  io.on("connection", (rawSocket) => {
+    const socket = rawSocket as AuthenticatedSocket;
+    socket.emit("session:ready", { user: socket.data.user });
 
-            const match = matchmaking.getMatch(socket);
-            const playerColor = match ? matchmaking.getPlayerColor(match, socket) : null;
-            if (!match || !playerColor) {
-                socket.emit("game-error", { message: "You are not in a match" });
-                return;
-            }
+    socket.on("matchmaking:join", () => matchmaking.join(socket));
+    socket.on("matchmaking:leave", () => matchmaking.leave(socket));
+    socket.on("move", (move) => {
+      if (!isMoveQuery(move)) {
+        socket.emit("game-error", { message: "Invalid move payload" });
+        return;
+      }
 
-            if (match.game.currentTurnColor !== playerColor) {
-                socket.emit("game-error", { message: `Wait for ${match.game.currentTurnColor}'s turn` });
-                return;
-            }
+      const match = matchmaking.getMatch(socket);
+      const playerColor = match
+        ? matchmaking.getPlayerColor(match, socket)
+        : null;
+      if (!match || !playerColor) {
+        socket.emit("game-error", { message: "You are not in a match" });
+        return;
+      }
 
-            const result = match.game.playMoveWithValidation(move);
-            if (!result.executed) {
-                socket.emit("game-error", { message: `Invalid move: ${result.result}` });
-                return;
-            }
-
-            matchmaking.recordMove(match, move);
-            for (const player of matchmaking.getConnectedPlayers(match)) player.emit("move", move);
-
-            if (match.game.currentStatus !== GameStatus.NOT_STARTED &&
-                match.game.currentStatus !== GameStatus.ACTIVE) {
-                const gameOver = {
-                    matchId: match.id,
-                    status: match.game.currentStatus,
-                    result: match.game.currentResult
-                } as const;
-                for (const player of matchmaking.getConnectedPlayers(match))
-                    player.emit("game-over", gameOver);
-                matchmaking.complete(match);
-            }
+      if (match.game.currentTurnColor !== playerColor) {
+        socket.emit("game-error", {
+          message: `Wait for ${match.game.currentTurnColor}'s turn`,
         });
-        socket.on("disconnect", () => matchmaking.disconnect(socket));
-    });
+        return;
+      }
 
-    return { io, matchmaking };
+      const result = match.game.playMoveWithValidation(move);
+      if (!result.executed) {
+        socket.emit("game-error", {
+          message: `Invalid move: ${result.result}`,
+        });
+        return;
+      }
+
+      matchmaking.recordMove(match, move);
+      for (const player of matchmaking.getConnectedPlayers(match))
+        player.emit("move", move);
+
+      if (
+        match.game.currentStatus !== GameStatus.NOT_STARTED &&
+        match.game.currentStatus !== GameStatus.ACTIVE
+      ) {
+        const gameOver = {
+          matchId: match.id,
+          status: match.game.currentStatus,
+          result: match.game.currentResult,
+        } as const;
+        for (const player of matchmaking.getConnectedPlayers(match))
+          player.emit("game-over", gameOver);
+        matchmaking.complete(match);
+      }
+    });
+    socket.on("disconnect", () => matchmaking.disconnect(socket));
+  });
+
+  return { io, matchmaking };
 }
 
 export { createSocketServer };
