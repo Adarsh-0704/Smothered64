@@ -9,19 +9,37 @@ const httpServer = createServer(app);
 const port = Number(process.env.PORT ?? 3001);
 const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
 
+const allowedOrigins = new Set(
+    webOrigin
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter((origin) => origin && origin !== "*")
+);
+
 app.use((req, res, next) => {
     const requestOrigin = req.headers.origin;
-    if (requestOrigin && (webOrigin === "*" || requestOrigin === webOrigin)) {
+
+    if (requestOrigin && allowedOrigins.has(requestOrigin)) {
         res.setHeader("Access-Control-Allow-Origin", requestOrigin);
         res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+
+    res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization"
+    );
+
+    res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PATCH, OPTIONS"
+    );
+
     if (req.method === "OPTIONS") {
         res.status(204).end();
         return;
     }
+
     next();
 });
 

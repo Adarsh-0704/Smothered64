@@ -14,4 +14,14 @@ interface AuthTokenPayload {
     readonly exp?: number;
 }
 
-export type { AuthTokenPayload, PublicUser, UserKind };
+interface PublicProfile {
+    readonly id: string;
+    readonly userId: string;
+    readonly email: string;
+    readonly displayName: string;
+    readonly bio: string | null;
+    readonly createdAt: string;
+    readonly updatedAt: string;
+}
+
+export type { AuthTokenPayload, PublicProfile, PublicUser, UserKind };

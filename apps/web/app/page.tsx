@@ -1,5 +1,5 @@
-import GameBoardDemo from "../components/chess/GameBoardDemo";
+import AuthGate from "../components/auth/AuthGate";
 
 export default function Home() {
-  return <GameBoardDemo />;
+  return <AuthGate />;
 }
