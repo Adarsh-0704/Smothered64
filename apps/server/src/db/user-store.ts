@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { prisma } from "./prisma.js";
+import { getPrisma } from "./prisma.js";
 import type { PublicProfile, PublicUser } from "../types/auth.js";
 
 interface StoredGuest extends PublicUser {
@@ -29,7 +29,7 @@ class UserStore {
         const normalizedEmail = email.trim().toLowerCase();
 
         try {
-            const user = await prisma.user.create({
+            const user = await getPrisma().user.create({
                 data: {
                     email: normalizedEmail,
                     passwordHash,
@@ -76,7 +76,7 @@ class UserStore {
             return guest;
         }
 
-        const user = await prisma.user.findUnique({
+        const user = await getPrisma().user.findUnique({
             where: { id },
             include: { profile: true },
         });
@@ -96,7 +96,7 @@ class UserStore {
     public async getCredentialsByEmail(
         email: string
     ): Promise<{ user: PublicUser; passwordHash: string } | null> {
-        const user = await prisma.user.findUnique({
+        const user = await getPrisma().user.findUnique({
             where: {
                 email: email.trim().toLowerCase(),
             },
@@ -123,7 +123,7 @@ class UserStore {
     public async getProfileByUserId(
         userId: string
     ): Promise<PublicProfile | null> {
-        const user = await prisma.user.findUnique({
+        const user = await getPrisma().user.findUnique({
             where: { id: userId },
             include: { profile: true },
         });
@@ -148,7 +148,7 @@ class UserStore {
         displayName: string,
         bio: string | null
     ): Promise<PublicProfile | null> {
-        const existingProfile = await prisma.profile.findUnique({
+        const existingProfile = await getPrisma().profile.findUnique({
             where: { userId },
         });
 
@@ -156,7 +156,7 @@ class UserStore {
             return null;
         }
 
-        await prisma.profile.update({
+        await getPrisma().profile.update({
             where: { userId },
             data: {
                 displayName: displayName.trim(),
