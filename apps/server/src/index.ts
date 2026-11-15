@@ -13,8 +13,14 @@ const allowedOrigins = new Set(
     webOrigin
         .split(",")
         .map((origin) => origin.trim())
-        .filter((origin) => origin && origin !== "*")
+        .filter(Boolean)
 );
+
+if (allowedOrigins.has("*")) {
+    throw new Error(
+        "WEB_ORIGIN=* is not supported with cookie authentication; configure explicit origins"
+    );
+}
 
 app.use((req, res, next) => {
     const requestOrigin = req.headers.origin;

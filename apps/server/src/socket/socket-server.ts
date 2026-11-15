@@ -31,7 +31,13 @@ function createSocketServer(
   const allowedOrigins = webOrigin
     .split(",")
     .map((origin) => origin.trim())
-    .filter((origin) => origin && origin !== "*");
+    .filter(Boolean);
+
+  if (allowedOrigins.includes("*")) {
+    throw new Error(
+      "WEB_ORIGIN=* is not supported with cookie authentication; configure explicit origins",
+    );
+  }
 
   const io = new Server(httpServer, {
     cors: {

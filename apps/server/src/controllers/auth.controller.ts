@@ -10,6 +10,7 @@ import { comparePassword, hashPassword } from "../utils/password.js";
 
 const COOKIE_NAME = "smothered_token";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 
 function getRequestBody(req: Request): Record<string, unknown> {
@@ -25,7 +26,7 @@ function getRequestBody(req: Request): Record<string, unknown> {
 const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
     path: "/",
 };
 
@@ -101,7 +102,7 @@ export async function register(
 
     const cleanedEmail = email.trim().toLowerCase();
 
-    if (!cleanedEmail.includes("@") || !cleanedEmail.includes(".")) {
+    if (!EMAIL_PATTERN.test(cleanedEmail)) {
         res.status(400).json({ message: "Invalid email address" });
         return;
     }
