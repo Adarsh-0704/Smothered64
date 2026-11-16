@@ -23,5 +23,8 @@
   "dependencies": {
     "@smothered/chess_rule_engine": "workspace:*",
     "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }
