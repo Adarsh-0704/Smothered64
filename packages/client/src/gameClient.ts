@@ -152,6 +152,21 @@ function isMatchEndedEvent(value: unknown): value is MatchEndedEvent
     return typeof match.matchId === "string" && typeof match.reason === "string";
 }
 
+function isOpponentDisconnectedEvent(value: unknown): value is { matchId: string; reconnectDeadline: string }
+{
+    if (!value || typeof value !== "object") return false;
+    const payload = value as Record<string, unknown>;
+    return typeof payload.matchId === "string" &&
+           typeof payload.reconnectDeadline === "string" &&
+           !Number.isNaN(Date.parse(payload.reconnectDeadline));
+}
+
+function isOpponentReconnectedEvent(value: unknown): value is { matchId: string }
+{
+    return !!value && typeof value === "object" &&
+        typeof (value as Record<string, unknown>).matchId === "string";
+}
+
 class GameClient
 {
     private game: Game;
@@ -178,6 +193,8 @@ class GameClient
         matchFound: new Set(),
         matchEnded: new Set(),
         gameOver: new Set(),
+        opponentDisconnected: new Set(),
+        opponentReconnected: new Set(),
         state: new Set()
     };
 
@@ -259,6 +276,11 @@ class GameClient
         this.send("move", move);
     }
 
+    public resign(): void
+    {
+        this.send("game:resign");
+    }
+
     public connect(url: string): Promise<void>
     {
         if (this.socket?.connected) return Promise.resolve();
@@ -274,6 +296,7 @@ class GameClient
                 settled = true;
                 this.connectionPromise = null;
                 this.emit("open", undefined);
+                if (this.matchId) socket.emit("matchmaking:join");
                 resolve();
             };
 
@@ -347,6 +370,16 @@ class GameClient
                     : payload;
                 this.handleMessage(message);
             };
+            const onOpponentDisconnected = (payload: unknown) => {
+                if (isOpponentDisconnectedEvent(payload))
+                    this.emit("opponentDisconnected", payload);
+                else this.emit("error", new Error("Server sent an invalid disconnect event"));
+            };
+            const onOpponentReconnected = (payload: unknown) => {
+                if (isOpponentReconnectedEvent(payload))
+                    this.emit("opponentReconnected", payload);
+                else this.emit("error", new Error("Server sent an invalid reconnect event"));
+            };
 
             this.addSocketListener(socket, "connect", onConnect);
             this.addSocketListener(socket, "connect_error", onConnectError);
@@ -362,6 +395,8 @@ class GameClient
             this.addSocketListener(socket, "match-found", onMatchFound);
             this.addSocketListener(socket, "match-ended", onMatchEnded);
             this.addSocketListener(socket, "game-over", onGameOver);
+            this.addSocketListener(socket, "opponent:disconnected", onOpponentDisconnected);
+            this.addSocketListener(socket, "opponent:reconnected", onOpponentReconnected);
 
         });
 
@@ -435,6 +470,7 @@ class GameClient
             if (this.matchId && message.matchId !== this.matchId) return;
 
             this.serverOutcome = { status: message.status, result: message.result };
+            this.matchId = null;
             this.selectedSq = null;
             this.legalMoves = [];
             const gameOver: GameOverEvent = {

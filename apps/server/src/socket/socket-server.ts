@@ -54,6 +54,19 @@ function createSocketServer(
 
     socket.on("matchmaking:join", () => matchmaking.join(socket));
     socket.on("matchmaking:leave", () => matchmaking.leave(socket));
+    socket.on("game:resign", () => {
+      const match = matchmaking.getMatch(socket);
+      const playerColor = match
+        ? matchmaking.getPlayerColor(match, socket)
+        : null;
+
+      if (!match || !playerColor) {
+        socket.emit("game-error", { message: "You are not in a match" });
+        return;
+      }
+
+      matchmaking.resign(match, playerColor);
+    });
     socket.on("move", (move) => {
       if (!isMoveQuery(move)) {
         socket.emit("game-error", { message: "Invalid move payload" });

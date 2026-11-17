@@ -18,6 +18,7 @@ interface SocketData {
 interface ClientToServerEvents {
   "matchmaking:join": () => void;
   "matchmaking:leave": () => void;
+  "game:resign": () => void;
   move: (move: MoveQuery<Position>) => void;
 }
 
@@ -32,6 +33,11 @@ interface ServerToClientEvents {
     opponent: { id: string; displayName: string };
   }) => void;
   "match-ended": (payload: { matchId: string; reason: string }) => void;
+  "opponent:disconnected": (payload: {
+    matchId: string;
+    reconnectDeadline: string;
+  }) => void;
+  "opponent:reconnected": (payload: { matchId: string }) => void;
   "game-state": (payload: {
     matchId: string;
     board: Array<

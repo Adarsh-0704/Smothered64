@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DefaultBoard, Game } from "@smothered/chess_rule_engine";
+import { DefaultBoard, Game, GameResult, GameStatus } from "@smothered/chess_rule_engine";
 import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
 import type { AuthenticatedSocket } from "../socket/socket-auth.js";
 
@@ -26,6 +26,8 @@ interface Match {
     readonly players: [MatchPlayer, MatchPlayer];
     readonly game: Game;
     readonly moveHistory: MoveQuery<Position>[];
+    reconnectTimer: NodeJS.Timeout | null;
+    reconnectDeadline: number | null;
 }
 
 class MatchmakingService
@@ -34,6 +36,15 @@ class MatchmakingService
     private readonly matches = new Map<string, Match>();
     private readonly matchIdsBySocketId = new Map<string, string>();
     private readonly matchIdsByUserId = new Map<string, string>();
+    private readonly reconnectGracePeriodMs: number;
+
+    public constructor(reconnectGracePeriodSeconds = Number(process.env.RECONNECT_GRACE_SECONDS ?? 60))
+    {
+        const seconds = Number.isFinite(reconnectGracePeriodSeconds) && reconnectGracePeriodSeconds > 0
+            ? reconnectGracePeriodSeconds
+            : 60;
+        this.reconnectGracePeriodMs = Math.floor(seconds * 1000);
+    }
 
     public join(socket: AuthenticatedSocket): void
     {
@@ -48,7 +59,12 @@ class MatchmakingService
                     return;
                 }
 
+                const wasDisconnected = player.socket === null;
                 this.attachSocket(existingMatch, player, socket);
+                if (wasDisconnected) {
+                    const opponent = existingMatch.players.find(candidate => candidate.userId !== player.userId);
+                    opponent?.socket?.emit("opponent:reconnected", { matchId: existingMatch.id });
+                }
                 this.sendMatchSnapshot(existingMatch, player);
                 return;
             }
@@ -114,6 +130,22 @@ class MatchmakingService
         // reattaches to this slot, then receives the full move stream.
         player.socket = null;
         this.matchIdsBySocketId.delete(socket.id);
+        delete socket.data.matchId;
+
+        match.reconnectDeadline = Date.now() + this.reconnectGracePeriodMs;
+        match.reconnectTimer = setTimeout(() => {
+            this.abandonMatch(match, player.userId);
+        }, this.reconnectGracePeriodMs);
+        match.reconnectTimer.unref?.();
+
+        for (const opponent of match.players) {
+            if (opponent.userId !== player.userId) {
+                opponent.socket?.emit("opponent:disconnected", {
+                    matchId: match.id,
+                    reconnectDeadline: new Date(match.reconnectDeadline).toISOString(),
+                });
+            }
+        }
     }
 
     public getMatch(socket: AuthenticatedSocket): Match | null
@@ -146,6 +178,21 @@ class MatchmakingService
         this.deleteMatch(match);
     }
 
+    public resign(match: Match, resigningColor: PlayerColor): void
+    {
+        const winner = resigningColor === "white" ? "black" : "white";
+        const gameOver = {
+            matchId: match.id,
+            status: winner === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
+            result: GameResult.RESIGN,
+        } as const;
+
+        for (const player of this.getConnectedPlayers(match))
+            player.emit("game-over", gameOver);
+
+        this.deleteMatch(match);
+    }
+
     private createMatch(first: AuthenticatedSocket, second: AuthenticatedSocket): void
     {
         const matchId = randomUUID();
@@ -158,7 +205,9 @@ class MatchmakingService
                 { userId: second.data.user.id, displayName: second.data.user.displayName, color: "black", socket: null }
             ],
             game,
-            moveHistory: []
+            moveHistory: [],
+            reconnectTimer: null,
+            reconnectDeadline: null,
         };
 
         this.matches.set(matchId, match);
@@ -173,6 +222,7 @@ class MatchmakingService
 
     private attachSocket(match: Match, player: MatchPlayer, socket: AuthenticatedSocket): void
     {
+        this.clearReconnectTimer(match);
         if (player.socket && player.socket.id !== socket.id)
             this.matchIdsBySocketId.delete(player.socket.id);
 
@@ -206,6 +256,7 @@ class MatchmakingService
 
     private deleteMatch(match: Match): void
     {
+        this.clearReconnectTimer(match);
         this.matches.delete(match.id);
         for (const player of match.players) {
             this.matchIdsByUserId.delete(player.userId);
@@ -220,6 +271,34 @@ class MatchmakingService
     private roomName(matchId: string): string
     {
         return `match:${matchId}`;
+    }
+
+    private abandonMatch(match: Match, disconnectedUserId: string): void
+    {
+        if (this.matches.get(match.id) !== match) return;
+
+        const disconnectedPlayer = match.players.find(player => player.userId === disconnectedUserId);
+        if (!disconnectedPlayer || disconnectedPlayer.socket) return;
+
+        const winner = match.players.find(player => player.userId !== disconnectedUserId);
+        if (!winner) return;
+
+        const gameOver = {
+            matchId: match.id,
+            status: winner.color === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
+            result: GameResult.ABANDONED,
+        } as const;
+        for (const player of this.getConnectedPlayers(match))
+            player.emit("game-over", gameOver);
+
+        this.deleteMatch(match);
+    }
+
+    private clearReconnectTimer(match: Match): void
+    {
+        if (match.reconnectTimer) clearTimeout(match.reconnectTimer);
+        match.reconnectTimer = null;
+        match.reconnectDeadline = null;
     }
 }
 
