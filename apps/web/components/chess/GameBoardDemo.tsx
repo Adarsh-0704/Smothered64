@@ -16,6 +16,8 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
   const [connected, setConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [matchStatus, setMatchStatus] = useState("Connecting to your game…");
+  const [reconnectDeadline, setReconnectDeadline] = useState<number | null>(null);
+  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -27,6 +29,8 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
     let removeMatchFoundListener = () => {};
     let removeMatchEndedListener = () => {};
     let removeGameOverListener = () => {};
+    let removeOpponentDisconnectedListener = () => {};
+    let removeOpponentReconnectedListener = () => {};
 
     async function startGameSession() {
       const serverUrl =
@@ -66,9 +70,20 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
         setMatchStatus("Searching for an opponent..."),
       );
 
-      removeGameOverListener = client.on("gameOver", () =>
-        setMatchStatus("Game over"),
-      );
+      removeGameOverListener = client.on("gameOver", () => {
+        setReconnectDeadline(null);
+        setMatchStatus("Game over");
+      });
+
+      removeOpponentDisconnectedListener = client.on("opponentDisconnected", (payload) => {
+        setReconnectDeadline(Date.parse(payload.reconnectDeadline));
+        setMatchStatus("Opponent disconnected");
+      });
+
+      removeOpponentReconnectedListener = client.on("opponentReconnected", () => {
+        setReconnectDeadline(null);
+        setMatchStatus("Opponent reconnected");
+      });
 
       if (!active) {
         client.disconnect();
@@ -99,9 +114,24 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
       removeMatchFoundListener();
       removeMatchEndedListener();
       removeGameOverListener();
+      removeOpponentDisconnectedListener();
+      removeOpponentReconnectedListener();
       client?.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    if (reconnectDeadline === null) {
+      setSecondsRemaining(null);
+      return;
+    }
+
+    const updateCountdown = () =>
+      setSecondsRemaining(Math.max(0, Math.ceil((reconnectDeadline - Date.now()) / 1000)));
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 250);
+    return () => window.clearInterval(timer);
+  }, [reconnectDeadline]);
 
   return (
     <main className="flex min-h-full flex-1 flex-col items-center px-5 py-10 text-[#efe9d0] sm:px-8 sm:py-14">
@@ -158,7 +188,11 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
       <p className="mt-6 max-w-[720px] text-center text-xs leading-5 text-[#7f8b88]">
         {connectionError ??
-          (connected ? matchStatus : "Connecting to your game…")}
+          (connected
+            ? reconnectDeadline !== null
+              ? `Opponent disconnected — ${secondsRemaining ?? 0}s to reconnect before you win by abandonment.`
+              : matchStatus
+            : "Connecting to your game…")}
       </p>
     </main>
   );
