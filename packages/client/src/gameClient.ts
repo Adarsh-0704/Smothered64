@@ -156,6 +156,7 @@ class GameClient
 {
     private game: Game;
     private board: GameBoardContext;
+    private serverOutcome: { status: GameStatus; result: GameResult } | null = null;
     private socket: SocketLike | null = null;
     private connectionPromise: Promise<void> | null = null;
     private removeSocketListeners: (() => void) | null = null;
@@ -196,8 +197,8 @@ class GameClient
     public getBoard(): GameBoardContext { return this.board.copyBoard(); }
 
     public getLastMove() { return this.game.lastMoveRecord; }
-    public getGameStatus(): GameStatus { return this.game.currentStatus; }
-    public getGameResult(): GameResult { return this.game.currentResult; }
+    public getGameStatus(): GameStatus { return this.serverOutcome?.status ?? this.game.currentStatus; }
+    public getGameResult(): GameResult { return this.serverOutcome?.result ?? this.game.currentResult; }
 
     public getState(): GameClientState
     {
@@ -209,8 +210,8 @@ class GameClient
             selectedSq: this.selectedSq,
             legalMoves: [...this.legalMoves],
             lastMove: this.game.lastMoveRecord,
-            status: this.game.currentStatus,
-            result: this.game.currentResult
+            status: this.getGameStatus(),
+            result: this.getGameResult()
         };
     }
 
@@ -407,6 +408,7 @@ class GameClient
             const remark = this.playMove(message.move);
             if (!remark.executed)
                 this.emit("error", new Error(`Server sent an invalid move: ${remark.result}`));
+            else this.serverOutcome = null;
         }
         else if (message.type === "state" || message.type === "game-state") {
             const nextGame = new Game();
@@ -415,8 +417,11 @@ class GameClient
                 return;
             }
 
-            nextGame.setCurrentTurnColor(message.turn);
+            if (message.turn === "black")
+                nextGame.applyChanges({ moves: [], captures: [], promotions: [] });
+
             this.game = nextGame;
+            this.serverOutcome = null;
             if (message.matchId) this.matchId = message.matchId;
             this.refreshBoard();
             this.selectedSq = null;
@@ -429,7 +434,7 @@ class GameClient
         else if (message.type === "game-over") {
             if (this.matchId && message.matchId !== this.matchId) return;
 
-            this.game.setCurrentOutcome(message.status, message.result);
+            this.serverOutcome = { status: message.status, result: message.result };
             this.selectedSq = null;
             this.legalMoves = [];
             const gameOver: GameOverEvent = {
