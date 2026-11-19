@@ -54,7 +54,7 @@ function createSocketServer(
 
     socket.on("matchmaking:join", () => matchmaking.join(socket));
     socket.on("matchmaking:leave", () => matchmaking.leave(socket));
-    socket.on("game:resign", () => {
+    socket.on("game:resign", async () => {
       const match = matchmaking.getMatch(socket);
       const playerColor = match
         ? matchmaking.getPlayerColor(match, socket)
@@ -65,9 +65,8 @@ function createSocketServer(
         return;
       }
 
-      matchmaking.resign(match, playerColor);
+      await matchmaking.resign(match, playerColor);
     });
-    socket.on("move", (move) => {
     socket.on("move", async (move) => {
       if (!isMoveQuery(move)) {
         socket.emit("game-error", { message: "Invalid move payload" });
@@ -106,15 +105,7 @@ function createSocketServer(
         match.game.currentStatus !== GameStatus.NOT_STARTED &&
         match.game.currentStatus !== GameStatus.ACTIVE
       ) {
-        const gameOver = {
-          matchId: match.id,
-          status: match.game.currentStatus,
-          result: match.game.currentResult,
-        } as const;
-        for (const player of matchmaking.getConnectedPlayers(match))
-          player.emit("game-over", gameOver);
-        await matchmaking.persistCompletedGame(match);
-        matchmaking.complete(match);
+        await matchmaking.complete(match);
       }
     });
     socket.on("disconnect", () => matchmaking.disconnect(socket));

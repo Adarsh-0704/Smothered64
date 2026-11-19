@@ -176,66 +176,19 @@ class MatchmakingService
         });
     }
 
-    public complete(match: Match): void
+    public async complete(match: Match): Promise<void>
     {
-        this.deleteMatch(match);
+        await this.finishMatch(match, match.game.currentStatus, match.game.currentResult);
     }
 
-    public resign(match: Match, resigningColor: PlayerColor): void
+    public async resign(match: Match, resigningColor: PlayerColor): Promise<void>
     {
         const winner = resigningColor === "white" ? "black" : "white";
-        const gameOver = {
-            matchId: match.id,
-            status: winner === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
-            result: GameResult.RESIGN,
-        } as const;
-
-        for (const player of this.getConnectedPlayers(match))
-            player.emit("game-over", gameOver);
-
-        this.deleteMatch(match);
-    public async persistCompletedGame(match: Match): Promise<void>
-    {
-        if (match.players.some(player => !player.isRegistered))
-            return;
-
-        const [whitePlayer, blackPlayer] = match.players;
-        const result = match.game.currentStatus === GameStatus.WHITE_WON
-            ? "white_win"
-            : match.game.currentStatus === GameStatus.BLACK_WON
-                ? "black_win"
-                : "draw";
-        const terminationReason = GameResult[match.game.currentResult].toLowerCase();
-
-        try {
-            await getPrisma().game.create({
-                data: {
-                    id: match.id,
-                    gameType: "casual",
-                    gameMode: "human",
-                    gameStatus: "completed",
-                    visibility: "public",
-                    timeControlCategory: "unlimited",
-                    whitePlayerId: whitePlayer.userId,
-                    blackPlayerId: blackPlayer.userId,
-                    initialTimeSeconds: 0,
-                    incrementSeconds: 0,
-                    result,
-                    terminationReason,
-                    createdAt: match.createdAt,
-                    startedAt: match.createdAt,
-                    endedAt: new Date(),
-                    moves: {
-                        create: match.moveHistory.map((move, index) => ({
-                            moveNumber: index + 1,
-                            uci: this.toUci(move),
-                        })),
-                    },
-                },
-            });
-        } catch (error) {
-            console.error("Failed to persist completed game", error);
-        }
+        await this.finishMatch(
+            match,
+            winner === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
+            GameResult.RESIGN,
+        );
     }
 
     private createMatch(first: AuthenticatedSocket, second: AuthenticatedSocket): void
@@ -329,15 +282,11 @@ class MatchmakingService
         const winner = match.players.find(player => player.userId !== disconnectedUserId);
         if (!winner) return;
 
-        const gameOver = {
-            matchId: match.id,
-            status: winner.color === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
-            result: GameResult.ABANDONED,
-        } as const;
-        for (const player of this.getConnectedPlayers(match))
-            player.emit("game-over", gameOver);
-
-        this.deleteMatch(match);
+        void this.finishMatch(
+            match,
+            winner.color === "white" ? GameStatus.WHITE_WON : GameStatus.BLACK_WON,
+            GameResult.ABANDONED,
+        );
     }
 
     private clearReconnectTimer(match: Match): void
@@ -345,6 +294,76 @@ class MatchmakingService
         if (match.reconnectTimer) clearTimeout(match.reconnectTimer);
         match.reconnectTimer = null;
         match.reconnectDeadline = null;
+    }
+
+    private async finishMatch(
+        match: Match,
+        status: GameStatus,
+        result: GameResult,
+    ): Promise<void>
+    {
+        if (this.matches.get(match.id) !== match) return;
+
+        const gameOver = { matchId: match.id, status, result } as const;
+        for (const player of this.getConnectedPlayers(match))
+            player.emit("game-over", gameOver);
+
+        // Remove the live match before awaiting database I/O so no further move
+        // can create a duplicate game record.
+        this.deleteMatch(match);
+        await this.persistCompletedGame(match, status, result);
+    }
+
+    private async persistCompletedGame(
+        match: Match,
+        status: GameStatus,
+        result: GameResult,
+    ): Promise<void>
+    {
+        // Guest identities only exist in memory and cannot satisfy the games
+        // table's user foreign keys, so only registered-vs-registered games
+        // are persisted.
+        if (match.players.some(player => !player.isRegistered)) return;
+
+        const [whitePlayer, blackPlayer] = match.players;
+        const gameResult = status === GameStatus.WHITE_WON
+            ? "white_win"
+            : status === GameStatus.BLACK_WON
+                ? "black_win"
+                : "draw";
+        const terminationReason = GameResult[result].toLowerCase();
+
+        try {
+            await getPrisma().game.create({
+                data: {
+                    id: match.id,
+                    gameType: "casual",
+                    gameMode: "human",
+                    gameStatus: result === GameResult.ABANDONED ? "abandoned" : "completed",
+                    visibility: "public",
+                    timeControlCategory: "unlimited",
+                    whitePlayerId: whitePlayer.userId,
+                    blackPlayerId: blackPlayer.userId,
+                    initialTimeSeconds: 0,
+                    incrementSeconds: 0,
+                    result: gameResult,
+                    terminationReason,
+                    createdAt: match.createdAt,
+                    startedAt: match.createdAt,
+                    endedAt: new Date(),
+                    moves: {
+                        create: match.moveHistory.map((move, index) => ({
+                            moveNumber: index + 1,
+                            uci: this.toUci(move),
+                        })),
+                    },
+                },
+            });
+        } catch (error) {
+            console.error("Failed to persist completed game", error);
+        }
+    }
+
     private toUci(move: MoveQuery<Position>): string
     {
         const file = (x: number) => String.fromCharCode("a".charCodeAt(0) + x);
