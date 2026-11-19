@@ -1,11 +1,19 @@
 # Smothered server
 
-The server uses PostgreSQL for registered users and profiles. Configure
-`DATABASE_URL` and run the migrations before starting the server:
+The server uses PostgreSQL for registered users and profiles. The Prisma
+schema and migrations implement the tables from `dbms/03_schema.sql`:
+`users`, `user_profiles`, `games`, and `game_moves`. The migration from the
+older `User`/`Profile` tables preserves registered users and profile bio/name
+data, converting old display names into unique usernames.
+
+Configure `DATABASE_URL` and apply migrations before starting the server:
 
 ```bash
 pnpm --filter @smothered/server db:migrate:deploy
 ```
+
+Use `db:migrate:dev` for local schema development, `db:status` to check applied
+migrations, and `db:generate` to regenerate Prisma Client after schema changes.
 
 Authentication is stored in an HTTP-only cookie. Create a guest session with:
 
@@ -30,4 +38,8 @@ socket.emit("matchmaking:join");
 
 The server emits `matchmaking:waiting` while queued and `match-found` when paired. The `match-found` payload contains `matchId`, `color`, and the opponent’s public identity. Clients can leave with `matchmaking:leave`; disconnecting notifies the opponent with `match-ended`.
 
-Guest users and matches are currently in-memory. Restarting the server clears them, so a persistent user store should replace `src/db/user-store.ts` when persistence is needed.
+Guest users and live matchmaking state are currently in-memory. Restarting the
+server clears those sessions and active matches. Once a human game finishes,
+matches between two registered users are written to `games` and `game_moves`;
+games involving guests remain in memory because guest users have no row in the
+schema's `users` table.

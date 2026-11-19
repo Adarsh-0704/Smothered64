@@ -89,13 +89,13 @@ export async function register(
         typeof email !== "string" ||
         typeof password !== "string" ||
         !name.trim() ||
-        name.trim().length > 50 ||
+        name.trim().length > 30 ||
         !email.trim() ||
         password.length < 8
     ) {
         res.status(400).json({
             message:
-                "A name of 1–50 characters, email, and password of at least 8 characters are required",
+                "A username of 1–30 characters, email, and password of at least 8 characters are required",
         });
         return;
     }
@@ -226,17 +226,27 @@ export async function updateProfile(
         return;
     }
 
-    const { displayName, bio } = getRequestBody(req);
+    const { username, avatarUrl, bio, country, dateOfBirth } = getRequestBody(req);
 
     if (
-        displayName !== undefined &&
-        (typeof displayName !== "string" ||
-            !displayName.trim() ||
-            displayName.trim().length > 50)
+        username !== undefined &&
+        (typeof username !== "string" ||
+            !username.trim() ||
+            username.trim().length > 30)
     ) {
         res.status(400).json({
-            message: "Display name must contain 1–50 characters",
+            message: "Username must contain 1–30 characters",
         });
+        return;
+    }
+
+    if (avatarUrl !== undefined && avatarUrl !== null && typeof avatarUrl !== "string") {
+        res.status(400).json({ message: "Avatar URL must be text or null" });
+        return;
+    }
+
+    if (country !== undefined && country !== null && typeof country !== "string") {
+        res.status(400).json({ message: "Country must be text or null" });
         return;
     }
 
@@ -251,6 +261,18 @@ export async function updateProfile(
         return;
     }
 
+    if (
+        dateOfBirth !== undefined &&
+        dateOfBirth !== null &&
+        (typeof dateOfBirth !== "string" ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) ||
+            Number.isNaN(Date.parse(`${dateOfBirth}T00:00:00.000Z`)) ||
+            new Date(`${dateOfBirth}T00:00:00.000Z`).toISOString().slice(0, 10) !== dateOfBirth)
+    ) {
+        res.status(400).json({ message: "Date of birth must use YYYY-MM-DD" });
+        return;
+    }
+
     try {
         const existingProfile = await userStore.getProfileByUserId(user.id);
 
@@ -259,17 +281,21 @@ export async function updateProfile(
             return;
         }
 
-        const profile = await userStore.updateProfile(
-            user.id,
-            typeof displayName === "string"
-                ? displayName.trim()
-                : existingProfile.displayName,
-            bio === undefined
-                ? existingProfile.bio
-                : typeof bio === "string"
-                    ? bio.trim()
-                    : null
-        );
+        const profile = await userStore.updateProfile(user.id, {
+            ...(typeof username === "string" ? { username: username.trim() } : {}),
+            ...(avatarUrl !== undefined
+                ? { avatarUrl: typeof avatarUrl === "string" ? avatarUrl.trim() || null : null }
+                : {}),
+            ...(bio !== undefined
+                ? { bio: typeof bio === "string" ? bio.trim() || null : null }
+                : {}),
+            ...(country !== undefined
+                ? { country: typeof country === "string" ? country.trim() || null : null }
+                : {}),
+            ...(dateOfBirth !== undefined
+                ? { dateOfBirth: typeof dateOfBirth === "string" ? dateOfBirth : null }
+                : {}),
+        });
 
         if (!profile) {
             res.status(404).json({ message: "Profile not found" });
@@ -277,7 +303,17 @@ export async function updateProfile(
         }
 
         res.status(200).json({ profile });
-    } catch {
+    } catch (error) {
+        if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code === "P2002"
+        ) {
+            res.status(409).json({ message: "Username is already taken" });
+            return;
+        }
+
         res.status(500).json({
             message: "Failed to update profile",
         });

@@ -54,7 +54,7 @@ function createSocketServer(
 
     socket.on("matchmaking:join", () => matchmaking.join(socket));
     socket.on("matchmaking:leave", () => matchmaking.leave(socket));
-    socket.on("move", (move) => {
+    socket.on("move", async (move) => {
       if (!isMoveQuery(move)) {
         socket.emit("game-error", { message: "Invalid move payload" });
         return;
@@ -99,6 +99,7 @@ function createSocketServer(
         } as const;
         for (const player of matchmaking.getConnectedPlayers(match))
           player.emit("game-over", gameOver);
+        await matchmaking.persistCompletedGame(match);
         matchmaking.complete(match);
       }
     });

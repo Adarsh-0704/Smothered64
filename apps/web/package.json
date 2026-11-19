@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm --filter @smothered/client... run build && next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm --filter @smothered/client... run build && tsc --noEmit"
   },
   "dependencies": {
     "@smothered/chess_rule_engine": "workspace:*",

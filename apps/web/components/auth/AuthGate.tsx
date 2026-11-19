@@ -222,14 +222,14 @@ export default function AuthGate() {
           {mode === "register" && (
             <div>
               <label className="mb-2 block text-sm">
-                Full name
+                Username
               </label>
 
               <input
                 name="name"
                 type="text"
                 required
-                maxLength={50}
+                maxLength={30}
                 autoComplete="name"
                 placeholder="Enter your name"
                 className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
