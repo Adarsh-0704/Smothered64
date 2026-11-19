@@ -15,13 +15,13 @@ interface AuthTokenPayload {
 }
 
 interface PublicProfile {
-    readonly id: string;
     readonly userId: string;
     readonly email: string;
-    readonly displayName: string;
+    readonly username: string;
+    readonly avatarUrl: string | null;
     readonly bio: string | null;
-    readonly createdAt: string;
-    readonly updatedAt: string;
+    readonly country: string | null;
+    readonly dateOfBirth: string | null;
 }
 
 export type { AuthTokenPayload, PublicProfile, PublicUser, UserKind };
