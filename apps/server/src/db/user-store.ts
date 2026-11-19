@@ -22,7 +22,7 @@ class UserStore {
     }
 
     public async createRegistered(
-        displayName: string,
+        username: string,
         email: string,
         passwordHash: string
     ): Promise<PublicUser> {
@@ -31,13 +31,11 @@ class UserStore {
         try {
             const user = await getPrisma().user.create({
                 data: {
+                    username: username.trim(),
                     email: normalizedEmail,
                     passwordHash,
-                    kind: "REGISTERED",
                     profile: {
-                        create: {
-                            displayName: displayName.trim(),
-                        },
+                        create: {},
                     },
                 },
                 include: {
@@ -51,7 +49,7 @@ class UserStore {
 
             return {
                 id: user.id,
-                displayName: user.profile.displayName,
+                displayName: user.username,
                 kind: "registered",
                 createdAt: user.createdAt.toISOString(),
             };
@@ -81,13 +79,13 @@ class UserStore {
             include: { profile: true },
         });
 
-        if (!user || !user.profile) {
+        if (!user || !user.profile || user.accountStatus !== "active") {
             return null;
         }
 
         return {
             id: user.id,
-            displayName: user.profile.displayName,
+            displayName: user.username,
             kind: "registered",
             createdAt: user.createdAt.toISOString(),
         };
@@ -105,14 +103,14 @@ class UserStore {
             },
         });
 
-        if (!user || !user.profile) {
+        if (!user || !user.profile || user.accountStatus !== "active") {
             return null;
         }
 
         return {
             user: {
                 id: user.id,
-                displayName: user.profile.displayName,
+                displayName: user.username,
                 kind: "registered",
                 createdAt: user.createdAt.toISOString(),
             },
@@ -128,27 +126,32 @@ class UserStore {
             include: { profile: true },
         });
 
-        if (!user || !user.profile) {
+        if (!user || !user.profile || user.accountStatus !== "active") {
             return null;
         }
 
         return {
-            id: user.profile.id,
             userId: user.id,
             email: user.email,
-            displayName: user.profile.displayName,
+            username: user.username,
+            avatarUrl: user.profile.avatarUrl,
             bio: user.profile.bio,
-            createdAt: user.profile.createdAt.toISOString(),
-            updatedAt: user.profile.updatedAt.toISOString(),
+            country: user.profile.country,
+            dateOfBirth: user.profile.dateOfBirth?.toISOString().slice(0, 10) ?? null,
         };
     }
 
     public async updateProfile(
         userId: string,
-        displayName: string,
-        bio: string | null
+        updates: {
+            readonly username?: string;
+            readonly avatarUrl?: string | null;
+            readonly bio?: string | null;
+            readonly country?: string | null;
+            readonly dateOfBirth?: string | null;
+        }
     ): Promise<PublicProfile | null> {
-        const existingProfile = await getPrisma().profile.findUnique({
+        const existingProfile = await getPrisma().userProfile.findUnique({
             where: { userId },
         });
 
@@ -156,12 +159,25 @@ class UserStore {
             return null;
         }
 
-        await getPrisma().profile.update({
-            where: { userId },
-            data: {
-                displayName: displayName.trim(),
-                bio,
-            },
+        await getPrisma().$transaction(async (transaction) => {
+            if (updates.username !== undefined) {
+                await transaction.user.update({
+                    where: { id: userId },
+                    data: { username: updates.username.trim() },
+                });
+            }
+
+            await transaction.userProfile.update({
+                where: { userId },
+                data: {
+                    ...(updates.avatarUrl !== undefined ? { avatarUrl: updates.avatarUrl } : {}),
+                    ...(updates.bio !== undefined ? { bio: updates.bio } : {}),
+                    ...(updates.country !== undefined ? { country: updates.country } : {}),
+                    ...(updates.dateOfBirth !== undefined
+                        ? { dateOfBirth: updates.dateOfBirth ? new Date(`${updates.dateOfBirth}T00:00:00.000Z`) : null }
+                        : {}),
+                },
+            });
         });
 
         return this.getProfileByUserId(userId);

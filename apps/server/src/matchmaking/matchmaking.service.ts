@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DefaultBoard, Game, GameResult, GameStatus } from "@smothered/chess_rule_engine";
 import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
+import { getPrisma } from "../db/prisma.js";
 import type { AuthenticatedSocket } from "../socket/socket-auth.js";
 
 type PlayerColor = "white" | "black";
@@ -17,6 +18,7 @@ interface MatchFoundPayload {
 interface MatchPlayer {
     readonly userId: string;
     readonly displayName: string;
+    readonly isRegistered: boolean;
     readonly color: PlayerColor;
     socket: AuthenticatedSocket | null;
 }
@@ -28,6 +30,7 @@ interface Match {
     readonly moveHistory: MoveQuery<Position>[];
     reconnectTimer: NodeJS.Timeout | null;
     reconnectDeadline: number | null;
+    readonly createdAt: Date;
 }
 
 class MatchmakingService
@@ -191,6 +194,48 @@ class MatchmakingService
             player.emit("game-over", gameOver);
 
         this.deleteMatch(match);
+    public async persistCompletedGame(match: Match): Promise<void>
+    {
+        if (match.players.some(player => !player.isRegistered))
+            return;
+
+        const [whitePlayer, blackPlayer] = match.players;
+        const result = match.game.currentStatus === GameStatus.WHITE_WON
+            ? "white_win"
+            : match.game.currentStatus === GameStatus.BLACK_WON
+                ? "black_win"
+                : "draw";
+        const terminationReason = GameResult[match.game.currentResult].toLowerCase();
+
+        try {
+            await getPrisma().game.create({
+                data: {
+                    id: match.id,
+                    gameType: "casual",
+                    gameMode: "human",
+                    gameStatus: "completed",
+                    visibility: "public",
+                    timeControlCategory: "unlimited",
+                    whitePlayerId: whitePlayer.userId,
+                    blackPlayerId: blackPlayer.userId,
+                    initialTimeSeconds: 0,
+                    incrementSeconds: 0,
+                    result,
+                    terminationReason,
+                    createdAt: match.createdAt,
+                    startedAt: match.createdAt,
+                    endedAt: new Date(),
+                    moves: {
+                        create: match.moveHistory.map((move, index) => ({
+                            moveNumber: index + 1,
+                            uci: this.toUci(move),
+                        })),
+                    },
+                },
+            });
+        } catch (error) {
+            console.error("Failed to persist completed game", error);
+        }
     }
 
     private createMatch(first: AuthenticatedSocket, second: AuthenticatedSocket): void
@@ -201,13 +246,14 @@ class MatchmakingService
         const match: Match = {
             id: matchId,
             players: [
-                { userId: first.data.user.id, displayName: first.data.user.displayName, color: "white", socket: null },
-                { userId: second.data.user.id, displayName: second.data.user.displayName, color: "black", socket: null }
+                { userId: first.data.user.id, displayName: first.data.user.displayName, isRegistered: first.data.user.kind === "registered", color: "white", socket: null },
+                { userId: second.data.user.id, displayName: second.data.user.displayName, isRegistered: second.data.user.kind === "registered", color: "black", socket: null }
             ],
             game,
             moveHistory: [],
             reconnectTimer: null,
             reconnectDeadline: null,
+            createdAt: new Date()
         };
 
         this.matches.set(matchId, match);
@@ -299,6 +345,12 @@ class MatchmakingService
         if (match.reconnectTimer) clearTimeout(match.reconnectTimer);
         match.reconnectTimer = null;
         match.reconnectDeadline = null;
+    private toUci(move: MoveQuery<Position>): string
+    {
+        const file = (x: number) => String.fromCharCode("a".charCodeAt(0) + x);
+        const from = `${file(move.from.x)}${8 - move.from.y}`;
+        const to = `${file(move.to.x)}${8 - move.to.y}`;
+        return `${from}${to}${move.promoteTo?.toLowerCase() ?? ""}`;
     }
 }
 

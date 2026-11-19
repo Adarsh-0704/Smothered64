@@ -7,29 +7,125 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserKind {
-  GUEST
-  REGISTERED
+enum AccountStatus {
+  active
+  inactive
+  suspended
+  banned
+  deleted
+
+  @@map("account_status")
+}
+
+enum GameType {
+  rated
+  casual
+
+  @@map("game_type")
+}
+
+enum GameMode {
+  human
+  computer
+
+  @@map("game_mode")
+}
+
+enum GameStatus {
+  completed
+  abandoned
+  cancelled
+
+  @@map("game_status")
+}
+
+enum GameVisibility {
+  public
+  private
+
+  @@map("game_visibility")
+}
+
+enum TimeControlCategory {
+  bullet
+  blitz
+  rapid
+  classical
+  unlimited
+
+  @@map("time_control_category")
+}
+
+enum GameResult {
+  white_win
+  black_win
+  draw
+
+  @@map("game_result")
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String
-  kind         UserKind @default(REGISTERED)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @map("user_id") @db.Uuid
+  username      String        @unique(map: "users_username_key") @db.VarChar(30)
+  email         String        @unique(map: "users_email_key") @db.VarChar(255)
+  passwordHash  String        @map("password_hash")
+  accountStatus AccountStatus @default(active) @map("account_status")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  profile Profile?
+  profile    UserProfile?
+  whiteGames Game[]       @relation("WhitePlayer")
+  blackGames Game[]       @relation("BlackPlayer")
+
+  @@map("users")
 }
 
-model Profile {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @db.Uuid
-  displayName String   @db.VarChar(50)
-  bio         String?  @db.VarChar(160)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model UserProfile {
+  userId      String    @id @map("user_id") @db.Uuid
+  avatarUrl   String?   @map("avatar_url") @db.Text
+  bio         String?   @db.Text
+  country     String?   @db.Text
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_profiles_user")
+
+  @@map("user_profiles")
+}
+
+model Game {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @map("game_id") @db.Uuid
+  gameType            GameType            @map("game_type")
+  gameMode            GameMode            @map("game_mode")
+  gameStatus          GameStatus          @default(completed) @map("game_status")
+  visibility          GameVisibility      @default(public)
+  timeControlCategory TimeControlCategory @map("time_control_category")
+  whitePlayerId       String              @map("white_player_id") @db.Uuid
+  blackPlayerId       String              @map("black_player_id") @db.Uuid
+  computerLevel       Int?                @map("computer_level") @db.SmallInt
+  initialTimeSeconds  Int                 @map("initial_time_seconds")
+  incrementSeconds    Int                 @default(0) @map("increment_seconds")
+  result              GameResult?
+  terminationReason   String?             @map("termination_reason") @db.Text
+  allowSpectators     Boolean             @default(true) @map("allow_spectators")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt           DateTime?           @map("started_at") @db.Timestamptz(6)
+  endedAt             DateTime?           @map("ended_at") @db.Timestamptz(6)
+
+  whitePlayer User       @relation("WhitePlayer", fields: [whitePlayerId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_games_white_player")
+  blackPlayer User       @relation("BlackPlayer", fields: [blackPlayerId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_games_black_player")
+  moves       GameMove[]
+
+  @@map("games")
+}
+
+model GameMove {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @map("move_id") @db.Uuid
+  gameId     String   @map("game_id") @db.Uuid
+  moveNumber Int      @map("move_number")
+  uci        String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_game_moves_game")
+
+  @@unique([gameId, moveNumber], map: "uq_game_move_number")
+  @@map("game_moves")
 }

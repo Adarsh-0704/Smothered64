@@ -68,6 +68,7 @@ function createSocketServer(
       matchmaking.resign(match, playerColor);
     });
     socket.on("move", (move) => {
+    socket.on("move", async (move) => {
       if (!isMoveQuery(move)) {
         socket.emit("game-error", { message: "Invalid move payload" });
         return;
@@ -112,6 +113,7 @@ function createSocketServer(
         } as const;
         for (const player of matchmaking.getConnectedPlayers(match))
           player.emit("game-over", gameOver);
+        await matchmaking.persistCompletedGame(match);
         matchmaking.complete(match);
       }
     });

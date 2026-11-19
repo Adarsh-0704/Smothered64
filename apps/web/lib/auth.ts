@@ -10,13 +10,13 @@ export interface AuthSession {
 }
 
 export interface AuthProfile {
-  id: string;
   userId: string;
   email: string;
-  displayName: string;
+  username: string;
+  avatarUrl: string | null;
   bio: string | null;
-  createdAt: string;
-  updatedAt: string;
+  country: string | null;
+  dateOfBirth: string | null;
 }
 
 const API_URL =
@@ -115,7 +115,13 @@ export async function getProfile(): Promise<AuthProfile> {
 }
 
 export async function updateProfile(
-  updates: { displayName?: string; bio?: string | null },
+  updates: {
+    username?: string;
+    avatarUrl?: string | null;
+    bio?: string | null;
+    country?: string | null;
+    dateOfBirth?: string | null;
+  },
 ): Promise<AuthProfile> {
   const response = await request<{ profile: AuthProfile }>("/profile", {
     method: "PATCH",

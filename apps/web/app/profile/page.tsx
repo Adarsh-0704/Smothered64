@@ -17,8 +17,11 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [bio, setBio] = useState("");
+  const [country, setCountry] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,8 +44,11 @@ export default function ProfilePage() {
 
         if (active) {
           setProfile(data);
-          setDisplayName(data.displayName);
+          setUsername(data.username);
+          setAvatarUrl(data.avatarUrl ?? "");
           setBio(data.bio ?? "");
+          setCountry(data.country ?? "");
+          setDateOfBirth(data.dateOfBirth ?? "");
         }
       } catch (err) {
         if (active) {
@@ -77,13 +83,19 @@ export default function ProfilePage() {
 
     try {
       const updatedProfile = await updateProfile({
-        displayName: displayName.trim(),
+        username: username.trim(),
+        avatarUrl: avatarUrl.trim() || null,
         bio: bio.trim() || null,
+        country: country.trim() || null,
+        dateOfBirth: dateOfBirth || null,
       });
 
       setProfile(updatedProfile);
-      setDisplayName(updatedProfile.displayName);
+      setUsername(updatedProfile.username);
+      setAvatarUrl(updatedProfile.avatarUrl ?? "");
       setBio(updatedProfile.bio ?? "");
+      setCountry(updatedProfile.country ?? "");
+      setDateOfBirth(updatedProfile.dateOfBirth ?? "");
       setSuccess("Your profile has been updated successfully.");
     } catch (err) {
       setError(
@@ -142,15 +154,30 @@ export default function ProfilePage() {
 
             <div>
               <label className="mb-2 block text-sm">
-                Display name
+                Username
               </label>
 
               <input
                 type="text"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
                 required
-                maxLength={50}
+                maxLength={30}
+                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm">
+                Avatar URL
+              </label>
+
+              <input
+                type="url"
+                value={avatarUrl}
+                onChange={(event) => setAvatarUrl(event.target.value)}
+                maxLength={2048}
+                placeholder="https://example.com/avatar.png"
                 className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
               />
             </div>
@@ -172,6 +199,26 @@ export default function ProfilePage() {
               <p className="mt-1 text-right text-xs text-[#7f8b88]">
                 {bio.length}/160
               </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm">Country</label>
+              <input
+                type="text"
+                value={country}
+                onChange={(event) => setCountry(event.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm">Date of birth</label>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(event) => setDateOfBirth(event.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
+              />
             </div>
 
             {error && (
