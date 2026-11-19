@@ -8,7 +8,7 @@ Smothered is a web-based chess project built as a TypeScript monorepo. The proje
 .
 ├── apps/
 │   ├── web/                 # Next.js web application
-│   └── backend/             # Backend application
+│   └── server/             # Backend application
 │
 ├── packages/
 │   └── chess/               # Reusable chess engine/library
