@@ -64,10 +64,17 @@ export async function createGuest(
                     return;
                 }
             } catch {
-                res.status(503).json({
-                    message: "Unable to retrieve the existing session",
-                });
-                return;
+                if (payload.userKind !== "guest") {
+                    res.status(503).json({
+                        message: "Unable to retrieve the existing session",
+                    });
+                    return;
+                }
+
+                // Guest users are kept in memory, so a server restart can
+                // leave a valid JWT pointing to a guest that no longer exists.
+                // Treat that stale guest session like any other invalid guest
+                // token and create a replacement below.
             }
         }
     }

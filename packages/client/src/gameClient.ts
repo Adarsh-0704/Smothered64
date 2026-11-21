@@ -293,6 +293,10 @@ class GameClient
             let settled = false;
 
             const onConnect = () => {
+                // Socket.IO reuses this Socket instance after an automatic
+                // reconnect. Keep the client pointed at it so send() and
+                // isConnected() work again after the connection is restored.
+                this.socket = socket;
                 settled = true;
                 this.connectionPromise = null;
                 this.emit("open", undefined);
@@ -314,8 +318,6 @@ class GameClient
             };
 
             const onDisconnect = (reason: unknown) => {
-                if (this.socket === socket) this.socket = null;
-
                 const close: CloseEvent = {
                     code: null,
                     reason: typeof reason === "string" ? reason : "Socket.IO disconnected",

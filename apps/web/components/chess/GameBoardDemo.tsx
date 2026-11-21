@@ -72,6 +72,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
       removeGameOverListener = client.on("gameOver", () => {
         setReconnectDeadline(null);
+        setSecondsRemaining(null);
         setMatchStatus("Game over");
       });
 
@@ -82,6 +83,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
       removeOpponentReconnectedListener = client.on("opponentReconnected", () => {
         setReconnectDeadline(null);
+        setSecondsRemaining(null);
         setMatchStatus("Opponent reconnected");
       });
 
@@ -122,7 +124,6 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
   useEffect(() => {
     if (reconnectDeadline === null) {
-      setSecondsRemaining(null);
       return;
     }
 
