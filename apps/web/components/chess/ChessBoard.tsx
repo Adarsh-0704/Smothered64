@@ -94,6 +94,12 @@ function resultLabel(result: GameResult): string {
       return "Fifty-move rule";
     case GameResultValue.DRAW_BY_INSUFFICIENT_MATERIAL:
       return "Insufficient material";
+    case GameResultValue.RESIGN:
+      return "Resignation";
+    case GameResultValue.ABANDONED:
+      return "Opponent abandoned the game";
+    case GameResultValue.TIMEOUT:
+      return "Time expired";
     default:
       return "Game complete";
   }
@@ -250,6 +256,20 @@ export default function ChessBoard({
           );
         })()}
       </div>
+      {!isGameOver && state.playerColor !== null && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("Resign this game? This cannot be undone."))
+                gameClient.resign();
+            }}
+            className="rounded-full border border-rose-300/40 px-4 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-400/10"
+          >
+            Resign game
+          </button>
+        </div>
+      )}
       {promotionMove && (
         <div
           className="fixed inset-0 z-10 grid place-items-center bg-black/60 p-4"

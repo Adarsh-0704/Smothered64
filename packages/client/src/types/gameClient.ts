@@ -73,6 +73,15 @@ interface GameOverEvent {
     readonly result: GameResult;
 }
 
+interface OpponentDisconnectedEvent {
+    readonly matchId: string;
+    readonly reconnectDeadline: string;
+}
+
+interface OpponentReconnectedEvent {
+    readonly matchId: string;
+}
+
 interface CloseEvent {
     readonly code: number | null;
     readonly reason: string;
@@ -89,6 +98,8 @@ interface GameClientEvents {
     readonly matchFound: MatchFoundEvent;
     readonly matchEnded: MatchEndedEvent;
     readonly gameOver: GameOverEvent;
+    readonly opponentDisconnected: OpponentDisconnectedEvent;
+    readonly opponentReconnected: OpponentReconnectedEvent;
     readonly state: GameClientState;
 }
 
@@ -98,6 +109,8 @@ export type {
     GameClientEvents,
     GameClientState,
     GameOverEvent,
+    OpponentDisconnectedEvent,
+    OpponentReconnectedEvent,
     GameOverMessage,
     GameServerMessage,
     MatchEndedEvent,
