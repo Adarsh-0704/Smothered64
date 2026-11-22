@@ -3,78 +3,77 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-
-import GameBoardDemo from "../chess/GameBoardDemo";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import {
   createGuestSession,
   getCurrentUser,
   loginUser,
-  logoutUser,
   registerUser,
 } from "../../lib/auth";
-
-import type { AuthSession } from "../../lib/auth";
 
 type AuthMode = "login" | "register";
 const LEGACY_AUTH_TOKEN_KEY = "smothered:auth-token";
 
 export default function AuthGate() {
+  const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
-  const [session, setSession] = useState<AuthSession | null>(null);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Restore a previously authenticated session.
   useEffect(() => {
-  let active = true;
+    let active = true;
 
-  async function restoreSession() {
-    try {
-      // First restore the session using the HTTP-only cookie.
-      const user = await getCurrentUser();
+    async function restoreSession() {
+      try {
+        // First restore the session using the HTTP-only cookie.
+        await getCurrentUser();
 
-      localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+        localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
 
-      if (active) {
-        setSession({ user });
-      }
-    } catch {
-      // Migrate an existing guest session from the previous implementation.
-      const legacyToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
+        if (active) {
+          router.replace("/play");
+        }
+        return;
+      } catch {
+        // Migrate an existing guest session from the previous implementation.
+        const legacyToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
 
-      if (legacyToken) {
-        try {
-          const data = await createGuestSession(legacyToken);
+        if (legacyToken) {
+          try {
+            await createGuestSession(legacyToken);
 
-          localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+            localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
 
-          if (active) {
-            setSession(data);
+            if (active) {
+              router.replace("/play");
+            }
+            return;
+          } catch {
+            // Keep the legacy token if the server is unavailable.
           }
-        } catch {
-          // Keep the legacy token if the server is unavailable.
+        }
+      } finally {
+        if (active) {
+          setChecking(false);
         }
       }
-    } finally {
-      if (active) {
-        setChecking(false);
-      }
     }
+
+    void restoreSession();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  function finishAuthentication() {
+    setError("");
+    router.replace("/play");
   }
-
-  void restoreSession();
-
-  return () => {
-    active = false;
-  };
-}, []);
-
-  function saveSession(data: AuthSession) {
-  setSession(data);
-  setError("");
-}
 
   // Handle registration and login.
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -92,12 +91,12 @@ export default function AuthGate() {
     const password = String(form.get("password") ?? "");
 
     try {
-      const data =
-        mode === "register"
-          ? await registerUser(name, email, password)
-          : await loginUser(email, password);
-
-      saveSession(data);
+      if (mode === "register") {
+        await registerUser(name, email, password);
+      } else {
+        await loginUser(email, password);
+      }
+      finishAuthentication();
     } catch (err) {
       setError(
         err instanceof Error
@@ -117,8 +116,8 @@ export default function AuthGate() {
     setError("");
 
     try {
-      const data = await createGuestSession();
-      saveSession(data);
+      await createGuestSession();
+      finishAuthentication();
     } catch (err) {
       setError(
         err instanceof Error
@@ -130,21 +129,6 @@ export default function AuthGate() {
     }
   }
 
-  // Sign out.
-  async function logout() {
-  try {
-    await logoutUser();
-
-    setSession(null);
-    setMode("login");
-    setError("");
-  } catch (err) {
-    setError(
-      err instanceof Error ? err.message : "Could not sign out",
-    );
-  }
-}
-
   if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#151b1d] text-[#efe9d0]">
@@ -153,25 +137,15 @@ export default function AuthGate() {
     );
   }
 
-  // Show the game after successful authentication.
-  if (session) {
-    return (
-      <GameBoardDemo
-  user={session.user}
-  onLogout={logout}
-/>
-    );
-  }
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#151b1d] px-5 py-10 text-[#efe9d0]">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#20272a] p-8 shadow-2xl">
 
-        <div className="mb-8 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.4em] text-[#c9a968]">
-            SMOTHERED
-          </p>
+        <Link href="/" className="mb-8 block text-center text-xs font-semibold uppercase tracking-[0.4em] text-[#c9a968] hover:text-[#dfc181]">
+          Smothered
+        </Link>
 
+        <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold">
             {mode === "login" ? "Welcome back" : "Create your account"}
           </h1>

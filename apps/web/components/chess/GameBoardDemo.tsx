@@ -150,6 +150,12 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
               <span className="text-sm text-[#c4cbc7]">
                 Playing as {user.displayName}
               </span>
+              <Link
+                href="/"
+                className="rounded-full border border-white/15 px-4 py-2 text-xs text-[#c4cbc7] transition hover:bg-white/10"
+              >
+                Dashboard
+              </Link>
               {user.kind === "registered" && (
                 <Link
                   href="/profile"
