@@ -38,6 +38,15 @@ socket.emit("matchmaking:join");
 
 The server emits `matchmaking:waiting` while queued and `match-found` when paired. The `match-found` payload contains `matchId`, `color`, and the opponent’s public identity. Clients can leave with `matchmaking:leave`; disconnecting notifies the opponent with `match-ended`.
 
+Registered users can retrieve their most recent games with:
+
+```http
+GET /api/v1/games/history
+```
+
+The endpoint requires the authenticated HTTP-only cookie and returns up to 50
+games by default. Pass `?limit=100` to request up to 100 games.
+
 Guest users and live matchmaking state are currently in-memory. Restarting the
 server clears those sessions and active matches. Once a human game finishes,
 matches between two registered users are written to `games` and `game_moves`;

@@ -1,32 +1,69 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import {
-  getCurrentUser,
-  getProfile,
-  updateProfile,
-} from "../../lib/auth";
+import { getCurrentUser, getProfile } from "../../lib/auth";
+import { getGameHistory } from "../../lib/games";
 
 import type { AuthProfile } from "../../lib/auth";
+import type { GameHistoryItem } from "../../lib/games";
+
+function gameOutcome(
+  game: GameHistoryItem,
+): { label: string; className: string } {
+  if (game.status === "cancelled" || game.result === null) {
+    return { label: "Cancelled", className: "text-[#a9b0ae]" };
+  }
+
+  if (game.result === "draw") {
+    return { label: "Draw", className: "text-[#c9a968]" };
+  }
+
+  const won =
+    (game.color === "white" && game.result === "white_win") ||
+    (game.color === "black" && game.result === "black_win");
+
+  return won
+    ? { label: "Won", className: "text-emerald-300" }
+    : { label: "Lost", className: "text-red-300" };
+}
+
+function gameDate(value: string | null): string {
+  if (!value) return "Date unavailable";
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function terminationLabel(value: string | null): string {
+  if (!value) return "Game complete";
+
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function profileInitials(username: string): string {
+  return username
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export default function ProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [username, setUsername] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [bio, setBio] = useState("");
-  const [country, setCountry] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-
+  const [games, setGames] = useState<GameHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -40,15 +77,14 @@ export default function ProfilePage() {
           return;
         }
 
-        const data = await getProfile();
+        const [data, history] = await Promise.all([
+          getProfile(),
+          getGameHistory(),
+        ]);
 
         if (active) {
           setProfile(data);
-          setUsername(data.username);
-          setAvatarUrl(data.avatarUrl ?? "");
-          setBio(data.bio ?? "");
-          setCountry(data.country ?? "");
-          setDateOfBirth(data.dateOfBirth ?? "");
+          setGames(history);
         }
       } catch (err) {
         if (active) {
@@ -72,42 +108,6 @@ export default function ProfilePage() {
     };
   }, [router]);
 
-  async function handleSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (saving) return;
-
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const updatedProfile = await updateProfile({
-        username: username.trim(),
-        avatarUrl: avatarUrl.trim() || null,
-        bio: bio.trim() || null,
-        country: country.trim() || null,
-        dateOfBirth: dateOfBirth || null,
-      });
-
-      setProfile(updatedProfile);
-      setUsername(updatedProfile.username);
-      setAvatarUrl(updatedProfile.avatarUrl ?? "");
-      setBio(updatedProfile.bio ?? "");
-      setCountry(updatedProfile.country ?? "");
-      setDateOfBirth(updatedProfile.dateOfBirth ?? "");
-      setSuccess("Your profile has been updated successfully.");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not update your profile",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#151b1d] text-[#efe9d0]">
@@ -118,150 +118,137 @@ export default function ProfilePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#151b1d] px-5 py-10 text-[#efe9d0]">
-      <section className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#20272a] p-8 shadow-2xl">
-        <div className="mb-8">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.4em] text-[#c9a968]">
-            SMOTHERED
-          </p>
+      <div className="w-full max-w-4xl space-y-6">
+        <section className="rounded-2xl border border-white/10 bg-[#20272a] p-8 shadow-2xl">
+          <div className="mb-8">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.4em] text-[#c9a968]">
+              SMOTHERED
+            </p>
+            <h1 className="text-3xl font-semibold">Your Profile</h1>
+            <p className="mt-2 text-sm text-[#a9b0ae]">
+              Your account and player information.
+            </p>
+          </div>
 
-          <h1 className="text-3xl font-semibold">
-            Your Profile
-          </h1>
+          {profile ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div
+                  aria-label={`${profile.username} avatar`}
+                  className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-[#c9a968]/50 bg-[#c9a968]/15 text-2xl font-semibold text-[#dfc181]"
+                >
+                  {profileInitials(profile.username)}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-2xl font-semibold">
+                    {profile.username}
+                  </h2>
+                  <p className="truncate text-sm text-[#a9b0ae]">
+                    {profile.email}
+                  </p>
+                </div>
+              </div>
 
-          <p className="mt-2 text-sm text-[#a9b0ae]">
-            Manage your personal information.
-          </p>
-        </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#7f8b88]">
+                    Country
+                  </p>
+                  <p className="mt-1 text-sm text-[#efe9d0]">
+                    {profile.country || "Not provided"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#7f8b88]">
+                    Date of birth
+                  </p>
+                  <p className="mt-1 text-sm text-[#efe9d0]">
+                    {profile.dateOfBirth || "Not provided"}
+                  </p>
+                </div>
+              </div>
 
-        {profile ? (
-          <form onSubmit={handleSave} className="space-y-5">
-            <div>
-              <label className="mb-2 block text-sm">
-                Email address
-              </label>
-
-              <input
-                type="email"
-                value={profile.email}
-                disabled
-                className="w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-[#7f8b88]"
-              />
-
-              <p className="mt-1 text-xs text-[#7f8b88]">
-                Email address cannot be changed here.
-              </p>
+              <div className="rounded-xl border border-white/10 bg-black/15 p-4">
+                <p className="text-xs uppercase tracking-wide text-[#7f8b88]">
+                  About
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#c4cbc7]">
+                  {profile.bio || "No bio added yet."}
+                </p>
+              </div>
             </div>
-
-            <div>
-              <label className="mb-2 block text-sm">
-                Username
-              </label>
-
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                required
-                maxLength={30}
-                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm">
-                Avatar URL
-              </label>
-
-              <input
-                type="url"
-                value={avatarUrl}
-                onChange={(event) => setAvatarUrl(event.target.value)}
-                maxLength={2048}
-                placeholder="https://example.com/avatar.png"
-                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm">
-                Bio
-              </label>
-
-              <textarea
-                value={bio}
-                onChange={(event) => setBio(event.target.value)}
-                maxLength={160}
-                rows={4}
-                placeholder="Tell others a little about yourself..."
-                className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
-              />
-
-              <p className="mt-1 text-right text-xs text-[#7f8b88]">
-                {bio.length}/160
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm">Country</label>
-              <input
-                type="text"
-                value={country}
-                onChange={(event) => setCountry(event.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm">Date of birth</label>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(event) => setDateOfBirth(event.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-[#c9a968]"
-              />
-            </div>
-
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"
-              >
+          ) : (
+            error && (
+              <p role="alert" className="text-sm text-red-300">
                 {error}
               </p>
-            )}
+            )
+          )}
 
-            {success && (
-              <p
-                role="status"
-                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300"
-              >
-                {success}
+          <Link
+            href="/"
+            className="mt-6 block text-center text-sm text-[#c9a968] hover:text-[#dfc181]"
+          >
+            ← Back to game
+          </Link>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-[#20272a] p-8 shadow-2xl">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#c9a968]">
+                History
               </p>
-            )}
+              <h2 className="text-2xl font-semibold">Your games</h2>
+              <p className="mt-2 text-sm text-[#a9b0ae]">
+                Your latest games against registered players.
+              </p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-[#a9b0ae]">
+              {games.length} {games.length === 1 ? "game" : "games"}
+            </span>
+          </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full rounded-lg bg-[#c9a968] py-3 font-semibold text-[#151b1d] transition hover:bg-[#dfc181] disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save changes"}
-            </button>
-          </form>
-        ) : (
-          error && (
-            <p role="alert" className="text-sm text-red-300">
-              {error}
-            </p>
-          )
-        )}
+          {games.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-black/10 px-5 py-8 text-center text-sm text-[#a9b0ae]">
+              No games yet. Start a game to build your history.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {games.map((game) => {
+                const outcome = gameOutcome(game);
 
-        <Link
-          href="/"
-          className="mt-6 block text-center text-sm text-[#c9a968] hover:text-[#dfc181]"
-        >
-          ← Back to game
-        </Link>
-      </section>
+                return (
+                  <article
+                    key={game.id}
+                    className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/15 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className={`font-semibold ${outcome.className}`}>
+                          {outcome.label}
+                        </span>
+                        <span className="text-sm text-[#c4cbc7]">
+                          vs. {game.opponent.displayName}
+                        </span>
+                        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#7f8b88]">
+                          {game.color}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-[#7f8b88]">
+                        {gameDate(game.endedAt)} · {game.moveCount} {game.moveCount === 1 ? "move" : "moves"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-[#a9b0ae] sm:text-right">
+                      {terminationLabel(game.terminationReason)}
+                    </span>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
