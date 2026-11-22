@@ -147,6 +147,7 @@ export default function ChessBoard({
   const isGameOver = state.status === GameStatusValue.WHITE_WON ||
     state.status === GameStatusValue.BLACK_WON ||
     state.status === GameStatusValue.DRAW;
+  const boardOrientation = state.playerColor === "black" ? "black" : orientation;
 
   function handleSquareClick(position: Position) {
     if (isGameOver) return;
@@ -191,7 +192,7 @@ export default function ChessBoard({
       >
         <div className="grid h-full w-full grid-cols-8 grid-rows-8">
           {Array.from({ length: 64 }, (_, index) => {
-            const position = displayPosition(index, orientation);
+            const position = displayPosition(index, boardOrientation);
             const boardIndex = positionToIndex(position);
             const piece = state.board.getAtPos(position);
             const isSelected = state.selectedSq === boardIndex;
