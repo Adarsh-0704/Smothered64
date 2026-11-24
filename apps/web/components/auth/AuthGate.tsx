@@ -34,9 +34,9 @@ function BoardMark() {
   );
 }
 
-export default function AuthGate() {
+export default function AuthGate({ initialMode = "login" }: { initialMode?: AuthMode }) {
   const router = useRouter();
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,10 +46,12 @@ export default function AuthGate() {
 
     async function restoreSession() {
       try {
-        await getCurrentUser();
+        const currentUser = await getCurrentUser();
         clearStoredAuthToken();
 
-        if (active) router.replace("/play");
+        if (currentUser.kind === "registered" && active) {
+          router.replace("/play");
+        }
         return;
       } catch {
         clearStoredAuthToken();

@@ -8,9 +8,12 @@ import { getCurrentUser, isUnauthorizedError } from "../../lib/auth";
 import { getGameHistory } from "../../lib/games";
 import type { GameHistoryItem } from "../../lib/games";
 import GameHistoryList from "../../components/profile/GameHistoryList";
+import AccountMenu from "../../components/navigation/AccountMenu";
+import type { AuthUser } from "../../lib/auth";
 
 export default function HistoryPage() {
   const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [games, setGames] = useState<GameHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +29,8 @@ export default function HistoryPage() {
           router.replace("/login");
           return;
         }
+
+        if (active) setUser(user);
 
         const history = await getGameHistory();
 
@@ -79,13 +84,14 @@ export default function HistoryPage() {
               Every registered-player match, all in one place.
             </p>
           </div>
-          <div className="flex gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm">
             <Link href="/profile" className="rounded-full border border-white/15 px-4 py-2 text-[#c4cbc7] hover:bg-white/10">
               Profile
             </Link>
             <Link href="/play" className="rounded-full bg-[#c9a968] px-4 py-2 font-semibold text-[#151b1d] hover:bg-[#dfc181]">
               Play
             </Link>
+            {user && <AccountMenu user={user} />}
           </div>
         </div>
 

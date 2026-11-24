@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { getCurrentUser } from "../../lib/auth";
 import type { AuthUser } from "../../lib/auth";
+import AccountMenu from "../navigation/AccountMenu";
 
 const previewBoard = [
   ["br", "bn", "bb", "bq", "bk", "bb", "", "br"],
@@ -107,10 +108,7 @@ export default function HomeDashboard() {
             {checking ? (
               <span className="home-account-muted">Checking session</span>
             ) : user ? (
-              <>
-                <span className="home-account-muted">Playing as</span>
-                <span className="home-account-name">{user.displayName}</span>
-              </>
+              <AccountMenu user={user} />
             ) : (
               <>
                 <span className="home-account-muted hidden sm:inline">Already have an account?</span>

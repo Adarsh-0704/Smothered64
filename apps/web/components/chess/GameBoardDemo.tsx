@@ -7,6 +7,7 @@ import { GameStatus as GameStatusValue } from "@smothered/chess_rule_engine";
 import ChessBoard from "./ChessBoard";
 import type { AuthUser } from "../../lib/auth";
 import Link from "next/link";
+import AccountMenu from "../navigation/AccountMenu";
 
 interface GameBoardDemoProps {
   user: AuthUser;
@@ -233,17 +234,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
               <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-400" : "bg-amber-400"}`} />
               {connected ? "Live room" : "Connecting"}
             </div>
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-semibold text-[#e7dfc9]">{user.displayName}</p>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-[#74817e]">{user.kind === "registered" ? "Member" : "Guest"}</p>
-            </div>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="border border-white/12 px-3 py-1.5 text-xs text-[#b8c0bc] transition hover:border-white/25 hover:bg-white/8 hover:text-white"
-            >
-              Sign out
-            </button>
+            <AccountMenu onLogout={onLogout} user={user} />
           </div>
         </header>
 
