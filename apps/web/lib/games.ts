@@ -1,3 +1,5 @@
+import { AuthError, clearStoredAuthToken } from "./auth";
+
 const API_URL =
   process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
 
@@ -38,7 +40,11 @@ export async function getGameHistory(): Promise<GameHistoryItem[]> {
         ? data.message
         : "Could not load game history";
 
-    throw new Error(message);
+    if (response.status === 401) {
+      clearStoredAuthToken();
+    }
+
+    throw new AuthError(message, response.status);
   }
 
   return (data as GameHistoryResponse).games;

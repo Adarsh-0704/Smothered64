@@ -7,9 +7,8 @@ import {
 import type { AuthRequest } from "../middleware/auth.middleware.js";
 import { generateToken, verifyToken } from "../utils/jwt.js";
 import { comparePassword, hashPassword } from "../utils/password.js";
+import { clearAuthCookie, setAuthCookie } from "../utils/auth-cookie.js";
 
-const COOKIE_NAME = "smothered_token";
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 
@@ -21,20 +20,6 @@ function getRequestBody(req: Request): Record<string, unknown> {
     }
 
     return body as Record<string, unknown>;
-}
-
-const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
-    path: "/",
-};
-
-function setAuthCookie(res: Response, token: string): void {
-    res.cookie(COOKIE_NAME, token, {
-        ...cookieOptions,
-        maxAge: COOKIE_MAX_AGE,
-    });
 }
 
 export async function createGuest(
@@ -177,7 +162,7 @@ export function me(req: AuthRequest, res: Response): void {
 }
 
 export function logout(_req: Request, res: Response): void {
-    res.clearCookie(COOKIE_NAME, cookieOptions);
+    clearAuthCookie(res);
     res.status(204).end();
 }
 

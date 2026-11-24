@@ -19,6 +19,28 @@ export interface AuthProfile {
   dateOfBirth: string | null;
 }
 
+const LEGACY_AUTH_TOKEN_KEY = "smothered:auth-token";
+
+export class AuthError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthError";
+    this.status = status;
+  }
+}
+
+export function clearStoredAuthToken(): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+  }
+}
+
+export function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof AuthError && error.status === 401;
+}
+
 const API_URL =
   process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
 
@@ -48,7 +70,11 @@ async function request<T>(
         ? data.message
         : "Authentication request failed";
 
-    throw new Error(message);
+    if (response.status === 401) {
+      clearStoredAuthToken();
+    }
+
+    throw new AuthError(message, response.status);
   }
 
   return data as T;
@@ -81,14 +107,9 @@ export function loginUser(
   });
 }
 
-export function createGuestSession(
-  legacyToken?: string,
-): Promise<AuthSession> {
+export function createGuestSession(): Promise<AuthSession> {
   return request<AuthSession>("/guest", {
     method: "POST",
-    headers: legacyToken
-      ? { Authorization: `Bearer ${legacyToken}` }
-      : undefined,
   });
 }
 
@@ -101,6 +122,8 @@ export async function getCurrentUser(): Promise<AuthUser> {
 }
 
 export function logoutUser(): Promise<void> {
+  clearStoredAuthToken();
+
   return request<void>("/logout", {
     method: "POST",
   });

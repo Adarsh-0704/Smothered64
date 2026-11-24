@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { userStore } from "../db/user-store.js";
 import { verifyToken } from "../utils/jwt.js";
+import { clearAuthCookie } from "../utils/auth-cookie.js";
 import type { PublicUser } from "../types/auth.js";
 
 interface AuthRequest extends Request {
@@ -44,6 +45,7 @@ async function authenticate(
         getBearerToken(req.headers.authorization);
 
     if (!token) {
+        clearAuthCookie(res);
         res.status(401).json({ message: "Unauthorized: token missing" });
         return;
     }
@@ -53,6 +55,7 @@ async function authenticate(
     try {
         payload = verifyToken(token);
     } catch {
+        clearAuthCookie(res);
         res.status(401).json({
             message: "Unauthorized: invalid or expired token",
         });
@@ -63,6 +66,7 @@ async function authenticate(
         const user = await userStore.getById(payload.userId);
 
         if (!user) {
+            clearAuthCookie(res);
             res.status(401).json({
                 message: "Unauthorized: user not found",
             });

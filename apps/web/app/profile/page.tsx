@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { getCurrentUser, getProfile } from "../../lib/auth";
+import { getCurrentUser, getProfile, isUnauthorizedError } from "../../lib/auth";
 import { getGameHistory } from "../../lib/games";
 import GameHistoryList from "../../components/profile/GameHistoryList";
 
@@ -52,6 +52,11 @@ export default function ProfilePage() {
         }
       } catch (err) {
         if (active) {
+          if (isUnauthorizedError(err)) {
+            router.replace("/login");
+            return;
+          }
+
           setError(
             err instanceof Error
               ? err.message

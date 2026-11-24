@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import {
+  clearStoredAuthToken,
   createGuestSession,
   getCurrentUser,
   loginUser,
@@ -14,7 +15,6 @@ import {
 } from "../../lib/auth";
 
 type AuthMode = "login" | "register";
-const LEGACY_AUTH_TOKEN_KEY = "smothered:auth-token";
 
 export default function AuthGate() {
   const router = useRouter();
@@ -32,30 +32,16 @@ export default function AuthGate() {
         // First restore the session using the HTTP-only cookie.
         await getCurrentUser();
 
-        localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+        clearStoredAuthToken();
 
         if (active) {
           router.replace("/play");
         }
         return;
       } catch {
-        // Migrate an existing guest session from the previous implementation.
-        const legacyToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
-
-        if (legacyToken) {
-          try {
-            await createGuestSession(legacyToken);
-
-            localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
-
-            if (active) {
-              router.replace("/play");
-            }
-            return;
-          } catch {
-            // Keep the legacy token if the server is unavailable.
-          }
-        }
+        // The session is no longer usable. Remove any legacy browser token so
+        // the login form can establish a fresh session.
+        clearStoredAuthToken();
       } finally {
         if (active) {
           setChecking(false);

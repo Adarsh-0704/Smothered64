@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { getCurrentUser, logoutUser } from "../../lib/auth";
+import { clearStoredAuthToken, getCurrentUser, logoutUser } from "../../lib/auth";
 import type { AuthUser } from "../../lib/auth";
 import GameBoardDemo from "../chess/GameBoardDemo";
 
@@ -23,6 +23,7 @@ export default function PlayGate() {
           setUser(currentUser);
         }
       } catch {
+        clearStoredAuthToken();
         if (active) {
           router.replace("/login");
         }
@@ -48,10 +49,20 @@ export default function PlayGate() {
     }
   }
 
-  if (checking || !user) {
+  if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#151b1d] text-[#efe9d0]">
         Checking your session...
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#151b1d] px-5 text-center text-[#efe9d0]">
+        <p>
+          Your session has expired. <a className="text-[#c9a968]" href="/login">Log in again</a>.
+        </p>
       </main>
     );
   }
