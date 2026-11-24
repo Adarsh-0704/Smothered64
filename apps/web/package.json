@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @smothered/client... run build && next build",
+    "build": "pnpm --filter @smothered/client... run build && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "pnpm --filter @smothered/client... run build && tsc --noEmit"

@@ -186,7 +186,7 @@ export default function ChessBoard({
   return (
     <div className={className}>
       <div
-        className="relative aspect-square w-[min(88vw,720px)] overflow-hidden rounded-[6px] border-[10px] border-[#d1b17a] bg-[#829d5c] bg-[url('/chess/boards/classic.png')] bg-cover bg-center bg-no-repeat shadow-[0_25px_55px_rgb(0_0_0_/_0.38),0_3px_0_rgb(255_255_255_/_0.09)_inset,0_-4px_0_rgb(0_0_0_/_0.18)_inset]"
+        className="relative aspect-square w-full max-w-[720px] overflow-hidden rounded-[6px] border-[10px] border-[#d1b17a] bg-[#829d5c] bg-[url('/chess/boards/classic.png')] bg-cover bg-center bg-no-repeat shadow-[0_25px_55px_rgb(0_0_0_/_0.38),0_3px_0_rgb(255_255_255_/_0.09)_inset,0_-4px_0_rgb(0_0_0_/_0.18)_inset]"
         role="grid"
         aria-label="Chess board"
       >
@@ -257,20 +257,6 @@ export default function ChessBoard({
           );
         })()}
       </div>
-      {!isGameOver && state.playerColor !== null && (
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("Resign this game? This cannot be undone."))
-                gameClient.resign();
-            }}
-            className="rounded-full border border-rose-300/40 px-4 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-400/10"
-          >
-            Resign game
-          </button>
-        </div>
-      )}
       {promotionMove && (
         <div
           className="fixed inset-0 z-10 grid place-items-center bg-black/60 p-4"
