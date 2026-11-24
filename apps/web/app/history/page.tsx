@@ -25,12 +25,11 @@ export default function HistoryPage() {
       try {
         const user = await getCurrentUser();
 
+        if (active) setUser(user);
+
         if (user.kind !== "registered") {
-          router.replace("/login");
           return;
         }
-
-        if (active) setUser(user);
 
         const history = await getGameHistory();
 
@@ -96,7 +95,17 @@ export default function HistoryPage() {
         </div>
 
         <section className="rounded-2xl border border-white/10 bg-[#20272a] p-6 shadow-2xl sm:p-8">
-          {error ? (
+          {user?.kind === "guest" ? (
+            <div className="rounded-xl border border-[#c9a968]/25 bg-[#c9a968]/[0.06] p-5 text-sm leading-6 text-[#c4cbc7]">
+              Guest matches are not saved to game history. Register an account and play registered-player matches to keep your results here.
+              <Link
+                className="mt-4 inline-flex rounded-full bg-[#c9a968] px-4 py-2 text-sm font-semibold text-[#182022] transition hover:bg-[#dfc181]"
+                href="/login?mode=register"
+              >
+                Create a registered account
+              </Link>
+            </div>
+          ) : error ? (
             <p role="alert" className="text-sm text-red-300">{error}</p>
           ) : (
             <GameHistoryList games={games} />

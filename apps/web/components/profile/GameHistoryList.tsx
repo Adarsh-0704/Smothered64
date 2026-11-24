@@ -43,7 +43,7 @@ interface GameHistoryListProps {
 
 export default function GameHistoryList({
   games,
-  emptyMessage = "No games yet. Start a game to build your history.",
+  emptyMessage = "No saved games yet. Finish a match between registered players to see it here.",
 }: GameHistoryListProps) {
   if (games.length === 0) {
     return (

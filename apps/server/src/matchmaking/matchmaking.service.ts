@@ -30,6 +30,7 @@ interface Match {
     readonly moveHistory: MoveQuery<Position>[];
     reconnectTimer: NodeJS.Timeout | null;
     reconnectDeadline: number | null;
+    disconnectedUserId: string | null;
     readonly createdAt: Date;
 }
 
@@ -135,17 +136,20 @@ class MatchmakingService
         this.matchIdsBySocketId.delete(socket.id);
         delete socket.data.matchId;
 
-        match.reconnectDeadline = Date.now() + this.reconnectGracePeriodMs;
-        match.reconnectTimer = setTimeout(() => {
-            this.abandonMatch(match, player.userId);
-        }, this.reconnectGracePeriodMs);
-        match.reconnectTimer.unref?.();
+        if (match.reconnectTimer === null) {
+            this.scheduleReconnectTimer(
+                match,
+                player.userId,
+                Date.now() + this.reconnectGracePeriodMs,
+            );
+        }
 
+        const reconnectDeadline = match.reconnectDeadline;
         for (const opponent of match.players) {
-            if (opponent.userId !== player.userId) {
+            if (opponent.userId !== player.userId && reconnectDeadline !== null) {
                 opponent.socket?.emit("opponent:disconnected", {
                     matchId: match.id,
-                    reconnectDeadline: new Date(match.reconnectDeadline).toISOString(),
+                    reconnectDeadline: new Date(reconnectDeadline).toISOString(),
                 });
             }
         }
@@ -206,6 +210,7 @@ class MatchmakingService
             moveHistory: [],
             reconnectTimer: null,
             reconnectDeadline: null,
+            disconnectedUserId: null,
             createdAt: new Date()
         };
 
@@ -221,7 +226,6 @@ class MatchmakingService
 
     private attachSocket(match: Match, player: MatchPlayer, socket: AuthenticatedSocket): void
     {
-        this.clearReconnectTimer(match);
         if (player.socket && player.socket.id !== socket.id)
             this.matchIdsBySocketId.delete(player.socket.id);
 
@@ -229,6 +233,19 @@ class MatchmakingService
         this.matchIdsBySocketId.set(socket.id, match.id);
         socket.data.matchId = match.id;
         socket.join(this.roomName(match.id));
+
+        const disconnectedPlayer = match.players.find(candidate => candidate.socket === null);
+
+        if (!disconnectedPlayer) {
+            this.clearReconnectTimer(match);
+        } else if (
+            match.reconnectDeadline !== null &&
+            match.disconnectedUserId !== disconnectedPlayer.userId
+        ) {
+            const deadline = match.reconnectDeadline;
+            this.clearReconnectTimer(match);
+            this.scheduleReconnectTimer(match, disconnectedPlayer.userId, deadline);
+        }
     }
 
     private sendMatchSnapshot(match: Match, player: MatchPlayer): void
@@ -248,6 +265,13 @@ class MatchmakingService
             board: DefaultBoard,
             turn: "white"
         });
+
+        if (!opponent.socket && match.reconnectDeadline !== null) {
+            socket.emit("opponent:disconnected", {
+                matchId: match.id,
+                reconnectDeadline: new Date(match.reconnectDeadline).toISOString(),
+            });
+        }
 
         for (const move of match.moveHistory)
             socket.emit("move", move);
@@ -294,6 +318,22 @@ class MatchmakingService
         if (match.reconnectTimer) clearTimeout(match.reconnectTimer);
         match.reconnectTimer = null;
         match.reconnectDeadline = null;
+        match.disconnectedUserId = null;
+    }
+
+    private scheduleReconnectTimer(
+        match: Match,
+        disconnectedUserId: string,
+        deadline: number,
+    ): void
+    {
+        match.disconnectedUserId = disconnectedUserId;
+        match.reconnectDeadline = deadline;
+        match.reconnectTimer = setTimeout(() => {
+            match.reconnectTimer = null;
+            this.abandonMatch(match, disconnectedUserId);
+        }, Math.max(0, deadline - Date.now()));
+        match.reconnectTimer.unref?.();
     }
 
     private async finishMatch(

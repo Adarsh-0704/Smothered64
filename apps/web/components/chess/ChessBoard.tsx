@@ -147,10 +147,11 @@ export default function ChessBoard({
   const isGameOver = state.status === GameStatusValue.WHITE_WON ||
     state.status === GameStatusValue.BLACK_WON ||
     state.status === GameStatusValue.DRAW;
+  const isGameActive = state.matchId !== null && state.playerColor !== null && !isGameOver;
   const boardOrientation = state.playerColor === "black" ? "black" : orientation;
 
   function handleSquareClick(position: Position) {
-    if (isGameOver) return;
+    if (!isGameActive) return;
 
     setError(null);
     const index = positionToIndex(position);
@@ -200,7 +201,8 @@ export default function ChessBoard({
             const isLastMove = lastMoveSquares.has(boardIndex);
             const isCapture = isLegalMove && piece !== null;
             const classes = [
-              "relative min-h-0 min-w-0 cursor-pointer select-none border-0 bg-transparent p-0 hover:bg-white/10 focus-visible:z-[3] focus-visible:outline-[3px] focus-visible:outline-[#f5d46e] focus-visible:outline-offset-[-3px]",
+              "relative min-h-0 min-w-0 select-none border-0 bg-transparent p-0 focus-visible:z-[3] focus-visible:outline-[3px] focus-visible:outline-[#f5d46e] focus-visible:outline-offset-[-3px]",
+              isGameActive ? "cursor-pointer hover:bg-white/10" : "cursor-not-allowed",
               isSelected && isLastMove ? "bg-[rgb(255_207_51_/_0.58)]" : "",
               isSelected && !isLastMove ? "bg-[rgb(255_207_51_/_0.46)]" : "",
               isLastMove && !isSelected ? "bg-[rgb(229_185_62_/_0.42)]" : "",
@@ -213,6 +215,7 @@ export default function ChessBoard({
                 role="gridcell"
                 className={classes}
                 aria-label={`${squareName(position)}${piece ? `, ${piece.color} ${piece.name}` : ""}`}
+                disabled={!isGameActive}
                 onClick={() => handleSquareClick(position)}
               >
                 {isLegalMove && (
@@ -232,6 +235,21 @@ export default function ChessBoard({
             );
           })}
         </div>
+        {!isGameActive && (
+          <div
+            className="absolute inset-0 z-[3] grid place-items-center bg-[#111719]/35 p-6 backdrop-blur-[1px]"
+            role="status"
+          >
+            <div className="rounded-2xl border border-white/15 bg-[#182122]/95 px-6 py-5 text-center text-[#efe9d0] shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#c9a968]">
+                {state.matchId === null ? "Matchmaking" : "Game paused"}
+              </p>
+              <p className="mt-2 text-sm text-[#c4cbc7]">
+                {state.matchId === null ? "Waiting for an opponent..." : "This game is not active."}
+              </p>
+            </div>
+          </div>
+        )}
         {isGameOver && (() => {
           const outcome = outcomeCopy(state);
           return (

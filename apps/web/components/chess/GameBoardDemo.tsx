@@ -97,6 +97,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [opponentName, setOpponentName] = useState<string | null>(null);
   const [reconnectDeadline, setReconnectDeadline] = useState<number | null>(null);
+  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -145,10 +146,13 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
       removeMatchEndedListener = client.on("matchEnded", () => {
         setOpponentName(null);
+        setReconnectDeadline(null);
+        setSecondsRemaining(null);
       });
 
       removeGameOverListener = client.on("gameOver", () => {
         setReconnectDeadline(null);
+        setSecondsRemaining(null);
       });
 
       removeOpponentDisconnectedListener = client.on("opponentDisconnected", (payload) => {
@@ -157,6 +161,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
 
       removeOpponentReconnectedListener = client.on("opponentReconnected", () => {
         setReconnectDeadline(null);
+        setSecondsRemaining(null);
       });
 
       if (!active) {
@@ -194,6 +199,18 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
       client?.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    if (reconnectDeadline === null) return;
+
+    const updateCountdown = () => {
+      setSecondsRemaining(Math.max(0, Math.ceil((reconnectDeadline - Date.now()) / 1000)));
+    };
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 250);
+    return () => window.clearInterval(timer);
+  }, [reconnectDeadline]);
 
   const playerColor = gameState?.playerColor ?? null;
   const opponentColor: PlayerColor | null = playerColor === null
@@ -254,6 +271,20 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
               statusTone={opponentStatus.tone}
               waiting={!opponentName}
             />
+
+            {reconnectDeadline !== null && (
+              <div className="border border-rose-300/30 bg-rose-400/[0.06] px-4 py-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-200">
+                  Opponent disconnected
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-[#f4edda]">
+                  {secondsRemaining ?? 0}s
+                </p>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-[#a9b0ae]">
+                  until abandonment
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.24em] text-[#66736f]">
               <span className="h-px flex-1 bg-white/10" />
