@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { GameClient } from "@smothered/client";
 import type { GameClientState } from "@smothered/client";
-import { GameStatus as GameStatusValue } from "@smothered/chess_rule_engine";
+import { GameStatus as GameStatusValue } from "@smothered/chess-rule-engine";
 import ChessBoard from "./ChessBoard";
+import { getGameServerUrl } from "../../lib/auth";
 import type { AuthUser } from "../../lib/auth";
 import Link from "next/link";
 import AccountMenu from "../navigation/AccountMenu";
@@ -113,8 +114,7 @@ export default function GameBoardDemo({ user, onLogout }: GameBoardDemoProps) {
     let removeStateListener = () => {};
 
     async function startGameSession() {
-      const serverUrl =
-        process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
+      const serverUrl = getGameServerUrl();
 
       // Connect using the authenticated user's HTTP-only session cookie.
       client = new GameClient(undefined, {

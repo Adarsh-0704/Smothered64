@@ -20,7 +20,7 @@ importers:
       '@prisma/client':
         specifier: ^7.10.1
         version: 7.10.1(prisma@7.10.1(@types/node@26.6.4)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
-      '@smothered/chess_rule_engine':
+      '@smothered/chess-rule-engine':
         specifier: workspace:*
         version: link:../../packages/chess_rule_engine
       '@smothered/shared':
@@ -69,7 +69,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@smothered/chess_rule_engine':
+      '@smothered/chess-rule-engine':
         specifier: workspace:*
         version: link:../../packages/chess_rule_engine
       '@smothered/client':
@@ -121,7 +121,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@smothered/chess_rule_engine':
+      '@smothered/chess-rule-engine':
         specifier: workspace:*
         version: link:../chess_rule_engine
       socket.io-client:

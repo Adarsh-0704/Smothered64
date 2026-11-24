@@ -8,7 +8,7 @@ import type {
     Position,
     BoardStringLayout,
     MoveRemark
-} from "@smothered/chess_rule_engine";
+} from "@smothered/chess-rule-engine";
 
 interface GameClientState {
     readonly board: GameBoardContext;

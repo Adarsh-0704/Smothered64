@@ -21,7 +21,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.18.3",
   "dependencies": {
-    "@smothered/chess_rule_engine": "workspace:*",
+    "@smothered/chess-rule-engine": "workspace:*",
     "socket.io-client": "^4.8.4"
   },
   "devDependencies": {

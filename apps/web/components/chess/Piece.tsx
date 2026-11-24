@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { PieceLayoutCode } from "@smothered/chess_rule_engine";
+import type { PieceLayoutCode } from "@smothered/chess-rule-engine";
 
 interface PieceProps {
   readonly code: PieceLayoutCode;

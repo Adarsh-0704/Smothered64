@@ -4,7 +4,7 @@ import type {
   GameStatus,
   MoveQuery,
   Position,
-} from "@smothered/chess_rule_engine";
+} from "@smothered/chess-rule-engine";
 import { userStore } from "../db/user-store.js";
 import { verifyToken } from "../utils/jwt.js";
 import type { PublicUser } from "../types/auth.js";

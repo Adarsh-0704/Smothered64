@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { DefaultBoard, Game, GameResult, GameStatus } from "@smothered/chess_rule_engine";
-import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
+import { DefaultBoard, Game, GameResult, GameStatus } from "@smothered/chess-rule-engine";
+import type { MoveQuery, Position } from "@smothered/chess-rule-engine";
 import { getPrisma } from "../db/prisma.js";
 import type { AuthenticatedSocket } from "../socket/socket-auth.js";
 

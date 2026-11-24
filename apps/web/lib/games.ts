@@ -1,7 +1,4 @@
-import { AuthError, clearStoredAuthToken } from "./auth";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
+import { AuthError, clearStoredAuthToken, getGameServerUrl } from "./auth";
 
 export interface GameHistoryItem {
   id: string;
@@ -24,7 +21,7 @@ interface GameHistoryResponse {
 }
 
 export async function getGameHistory(): Promise<GameHistoryItem[]> {
-  const response = await fetch(`${API_URL}/api/v1/games/history`, {
+  const response = await fetch(`${getGameServerUrl()}/api/v1/games/history`, {
     method: "GET",
     credentials: "include",
   });

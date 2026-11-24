@@ -8,8 +8,8 @@ import type {
   PieceName,
   PieceNameCode,
   Position,
-} from "@smothered/chess_rule_engine";
-import { GameResult as GameResultValue, GameStatus as GameStatusValue } from "@smothered/chess_rule_engine";
+} from "@smothered/chess-rule-engine";
+import { GameResult as GameResultValue, GameStatus as GameStatusValue } from "@smothered/chess-rule-engine";
 import Piece from "./Piece";
 
 type BoardOrientation = "white" | "black";

@@ -7,14 +7,14 @@ import {
     Game,
     GameResult,
     GameStatus
-} from "@smothered/chess_rule_engine";
+} from "@smothered/chess-rule-engine";
 import type {
     BoardStringLayout,
     GameBoardContext,
     MoveQuery,
     MoveRemark,
     Position
-} from "@smothered/chess_rule_engine";
+} from "@smothered/chess-rule-engine";
 import type {
     CloseEvent,
     GameClientEvents,

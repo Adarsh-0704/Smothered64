@@ -41,15 +41,26 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof AuthError && error.status === 401;
 }
 
-const API_URL =
-  process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
+export function getGameServerUrl(): string {
+  if (typeof window !== "undefined") {
+    const { hostname, protocol } = window.location;
+
+    // Keep localhost sessions same-site so HTTP-only cookies work during
+    // local development, even when the LAN URL is configured in .env.local.
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return `${protocol}//${hostname}:3001`;
+    }
+  }
+
+  return process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
+}
 
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
   const response = await fetch(
-    `${API_URL}/api/v1/auth${endpoint}`,
+    `${getGameServerUrl()}/api/v1/auth${endpoint}`,
     {
       ...options,
       credentials: "include",

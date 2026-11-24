@@ -2,8 +2,8 @@ import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { MatchmakingService } from "../matchmaking/matchmaking.service.js";
 import { authenticateSocket, type AuthenticatedSocket } from "./socket-auth.js";
-import { GameStatus } from "@smothered/chess_rule_engine";
-import type { MoveQuery, Position } from "@smothered/chess_rule_engine";
+import { GameStatus } from "@smothered/chess-rule-engine";
+import type { MoveQuery, Position } from "@smothered/chess-rule-engine";
 
 function isMoveQuery(value: unknown): value is MoveQuery<Position> {
   if (!value || typeof value !== "object") return false;
