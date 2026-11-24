@@ -201,11 +201,12 @@ export default function ChessBoard({
             const isLastMove = lastMoveSquares.has(boardIndex);
             const isCapture = isLegalMove && piece !== null;
             const classes = [
-              "relative min-h-0 min-w-0 select-none border-0 bg-transparent p-0 focus-visible:z-[3] focus-visible:outline-[3px] focus-visible:outline-[#f5d46e] focus-visible:outline-offset-[-3px]",
-              isGameActive ? "cursor-pointer hover:bg-white/10" : "cursor-not-allowed",
-              isSelected && isLastMove ? "bg-[rgb(255_207_51_/_0.58)]" : "",
+              "relative min-h-0 min-w-0 select-none border-0 p-0 focus-visible:z-[3] focus-visible:outline-[3px] focus-visible:outline-[#f5d46e] focus-visible:outline-offset-[-3px]",
+              isGameActive ? "cursor-pointer" : "cursor-not-allowed",
+              isGameActive && !isLastMove ? "hover:bg-white/10" : "",
+              isSelected && isLastMove ? "ring-[3px] ring-inset ring-[rgb(196_157_55_/_0.94)]" : "",
               isSelected && !isLastMove ? "bg-[rgb(255_207_51_/_0.46)]" : "",
-              isLastMove && !isSelected ? "bg-[rgb(229_185_62_/_0.42)]" : "",
+              isLastMove && !isSelected ? "ring-[3px] ring-inset ring-[rgb(205_169_66_/_0.9)]" : "",
             ].filter(Boolean).join(" ");
 
             return (
@@ -214,7 +215,7 @@ export default function ChessBoard({
                 type="button"
                 role="gridcell"
                 className={classes}
-                aria-label={`${squareName(position)}${piece ? `, ${piece.color} ${piece.name}` : ""}`}
+                aria-label={`${squareName(position)}${piece ? `, ${piece.color} ${piece.name}` : ""}${isLastMove ? ", last move" : ""}`}
                 disabled={!isGameActive}
                 onClick={() => handleSquareClick(position)}
               >
